@@ -131,6 +131,14 @@ var I = {
   'kind.record':{zh:'記錄',en:'Record',th:'บันทึก'},
   'dl.fail':{zh:'下載失敗，請稍後再試',en:'Download failed, please retry',th:'ดาวน์โหลดไม่สำเร็จ โปรดลองใหม่'},
   'res.na':{zh:'N/A',en:'N/A',th:'N/A'},
+  // ── S-10 降級與錯誤呈現 ──
+  'degrade.title':{zh:'目前資源不足，已切換為手動錄音',en:'Resources are short — switched to manual recording',th:'ทรัพยากรไม่พอ — สลับเป็นการอัดเสียงเอง'},
+  'degrade.toBatch':{zh:'改用手動錄音上傳',en:'Use manual upload',th:'อัปโหลดเสียงเอง'},
+  'degrade.ram':{zh:'記憶體用量已達上限',en:'Memory usage at cap',th:'หน่วยความจำเต็มเพดาน'},
+  'degrade.storage':{zh:'儲存空間已達上限',en:'Storage at cap',th:'พื้นที่จัดเก็บเต็มเพดาน'},
+  'degrade.asr_endpoint':{zh:'尚未設定即時辨識（ASR）端點',en:'No live ASR endpoint configured',th:'ยังไม่ได้ตั้งเอนด์พอยต์ ASR'},
+  'degrade.live_tr_endpoint':{zh:'尚未設定即時翻譯端點',en:'No live translation endpoint configured',th:'ยังไม่ได้ตั้งเอนด์พอยต์แปลสด'},
+  'degrade.disconnected':{zh:'即時連線中斷，已停止即時服務',en:'Live connection lost — live service stopped',th:'การเชื่อมต่อสดหลุด — หยุดบริการสด'},
   'err.generic':{zh:'操作失敗，請稍後再試',en:'Action failed, please retry',th:'ดำเนินการไม่สำเร็จ'}
 };
   var lang = 'zh';

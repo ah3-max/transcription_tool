@@ -273,3 +273,22 @@
   body.dark .seg button.on,body.dark .pv-fmt button.on{color:var(--teal)}
   body.dark .card h3 .tag{color:var(--teal)}
   body.dark .brand b{color:var(--ink)}
+
+  /* ===== 降級橫幅 + toast（S-10） ===== */
+  .degrade-banner{display:flex;align-items:center;gap:14px;margin:0 0 20px;padding:14px 18px;
+    background:var(--clay-soft);border:1px solid var(--clay);border-radius:12px;color:var(--ink)}
+  .degrade-banner .db-ico{font-size:22px;color:var(--gold);flex:none}
+  .degrade-banner .db-body{flex:1;display:flex;flex-direction:column;gap:2px}
+  .degrade-banner .db-body strong{font-size:18px}
+  .degrade-banner .db-reason{font-size:15px;color:var(--ink-soft)}
+
+  .toast-wrap{position:fixed;right:20px;bottom:20px;z-index:1000;display:flex;flex-direction:column;gap:10px;
+    max-width:min(420px,92vw);pointer-events:none}
+  .toast{pointer-events:auto;display:flex;align-items:flex-start;gap:10px;padding:14px 16px;border-radius:12px;
+    background:var(--surface);border:1px solid var(--line);box-shadow:0 8px 28px rgba(0,0,0,.18);
+    font-size:16px;line-height:1.6;animation:toastIn .18s ease-out}
+  .toast.err{border-color:var(--rec);background:color-mix(in srgb,var(--rec) 10%,var(--surface))}
+  .toast.ok{border-color:var(--ok)}
+  .toast .tx{flex:1}
+  .toast .tc{flex:none;background:none;border:none;color:var(--ink-faint);font-size:20px;line-height:1;padding:0 2px}
+  @keyframes toastIn{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}

@@ -30,3 +30,17 @@
 - **可同時**：A 軌（零交集）、C 軌（只靠降級訊號約定，且各動 app.js 不同區塊——須協調但不阻塞）。
 - **須先做的價值**：第 2 步降級訊號約定是 C 軌 S-06 的依賴介面，**先凍結它可解 C 軌依賴**，故建議與 A 軌一起先行。
 - **app.js 共用注意**：B（全域橫幅/toast）、C（即時頁）、D（記錄頁）動不同區塊；同一時間多軌動 app.js 時以「區塊不重疊」為界、避免合併衝突。
+
+---
+
+## 5. 降級訊號介面約定（**已凍結 2026-06-26**——C 軌 S-06 照此實作）
+1. **連線前守門**：WS `/ws/live` 建立前（或 onopen 後第一步），後端呼叫 `services.resources.live_readiness()`：
+   - `ready=False` → 不開即時、回 readiness 結果（含 `reasons`），前端顯示降級橫幅；
+   - 前端亦可先打 `GET /api/resources/live-readiness` 預判（已實作）。
+2. **連線中掉線**：S-06 在串流過程偵測資源掉線／端點失聯時，下行一筆
+   `{"type":"degraded","reason":"<code>"}`，其中 `<code>` ∈ `live_readiness()` 的 reasons 代碼集
+   （`ram`/`storage`/`asr_endpoint`/`live_tr_endpoint`）或 `disconnected`。
+3. **前端對應**：app.js 已備 `setLiveDegraded(reasons)`／`degrade.<code>` 三語字串；S-06 收到 `degraded`
+   下行時呼叫之並停止即時 UI（`degrade.disconnected` 字串已備）。
+4. **reasons 代碼為唯一真實來源**：新增降級原因時，同步加 `services.resources.live_readiness()` 代碼
+   ＋ `web/i18n.js` 的 `degrade.<code>` 三語，避免顯示/邏輯脫鉤。

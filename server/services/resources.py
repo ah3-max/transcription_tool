@@ -10,6 +10,7 @@ import httpx
 import psutil
 
 from config import settings
+from services.routing import resolve_endpoint
 
 
 def ram_usage() -> dict:
@@ -52,6 +53,25 @@ async def snapshot() -> dict:
         "gpu": await vram_usage(),
         "cap_pct": round(settings.res_cap * 100, 1),
     }
+
+
+def live_readiness() -> dict:
+    """即時翻譯能否起（S-10，NFR-2/SEC-5）。供 WS 連線前守門與前端降級判斷。
+
+    回 {"ready": bool, "reasons": [code...], "detail": {...}}。
+    reasons 代碼（前端對應三語訊息）：
+      - "ram" / "storage"：app 可量資源已達 RES_CAP（can_reserve 不過）；
+      - "asr_endpoint"：未設定 active 的 ASR 端點（即時辨識必須 vLLM）；
+      - "live_tr_endpoint"：未設定 active 的即時翻譯端點。
+    S-06 WS 連線前呼叫此函式；連線中資源掉線則下行 {"type":"degraded","reason":...}。
+    """
+    ok_res, detail = can_reserve()
+    reasons = list(detail["over"]) if not ok_res else []
+    if resolve_endpoint("asr") is None:
+        reasons.append("asr_endpoint")
+    if resolve_endpoint("live_tr") is None:
+        reasons.append("live_tr_endpoint")
+    return {"ready": not reasons, "reasons": reasons, "detail": detail}
 
 
 def can_reserve() -> tuple[bool, dict]:

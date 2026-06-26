@@ -10,6 +10,17 @@
   function esc(s){ return String(s == null ? '' : s)
     .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
 
+  // ── 統一錯誤／提示 toast（S-10）：取代散落 alert，自動消失、可手動關 ──
+  function showToast(msg, kind){
+    var wrap=$('toastWrap'); if(!wrap){ return; }
+    var el=document.createElement('div'); el.className='toast'+(kind?(' '+kind):'');
+    el.innerHTML='<span class="tx">'+esc(msg||t('err.generic'))+'</span><button class="tc" aria-label="close">×</button>';
+    var kill=function(){ if(el.parentNode){ el.parentNode.removeChild(el); } };
+    el.querySelector('.tc').addEventListener('click', kill);
+    wrap.appendChild(el);
+    setTimeout(kill, kind==='err'?6000:4000);
+  }
+
   // ── API 層 ──
   var api = {
     async json(method, path, body){
@@ -38,7 +49,7 @@
       if(!r.ok){
         var m = t('dl.fail');
         try { var j = await r.json(); if(j && j.message) m = j.message; } catch(e){}
-        if(msgEl) msgEl.textContent = m; else alert(m);
+        if(msgEl) msgEl.textContent = m; else showToast(m,'err');
         return;
       }
       var blob = await r.blob();
@@ -48,7 +59,7 @@
       document.body.appendChild(a); a.click(); a.remove();
       setTimeout(function(){ URL.revokeObjectURL(url); }, 1000);
     } catch(e){
-      if(msgEl) msgEl.textContent = t('dl.fail'); else alert(t('dl.fail'));
+      if(msgEl) msgEl.textContent = t('dl.fail'); else showToast(t('dl.fail'),'err');
     }
   }
 
@@ -61,6 +72,7 @@
     document.querySelectorAll('#nav button').forEach(function(b){b.classList.toggle('on', b.dataset.p===p);});
     document.querySelectorAll('#mnav button').forEach(function(b){b.classList.toggle('on', b.dataset.p===p);});
     crumb(); document.querySelector('.main').scrollTop=0;
+    if(p==='live'){ checkLiveReadiness(); }
     if(p==='set'){ loadEndpoints(); }
     if(p==='batch'){ loadJobs(); }
     if(p==='gen'){ loadTranscriptSources(); loadRecords(); }
@@ -112,12 +124,39 @@
   }
   setInterval(pollResources, 5000);
 
+  // ══════════════════════════ 即時就緒檢查／降級（S-10） ══════════════════════════
+  // 連線前查 /resources/live-readiness：不足→顯示橫幅、停即時、引導手動錄音。
+  // 連線中資源掉線的 degraded 下行訊號由 S-06 WS 處理（約定已凍結，見 plan-log）。
+  var liveReady=true;
+  function setLiveDegraded(reasons){
+    var banner=$('liveBanner'); if(!banner) return;
+    liveReady = !reasons || !reasons.length;
+    var startBtn=$('startStream');
+    if(liveReady){
+      banner.style.display='none';
+      if(startBtn) startBtn.disabled=false;
+    } else {
+      var rEl=$('liveBannerReason');
+      if(rEl) rEl.textContent = reasons.map(function(c){ return t('degrade.'+c); }).join('、');
+      banner.style.display='flex';
+      if(startBtn) startBtn.disabled=true;
+    }
+  }
+  async function checkLiveReadiness(){
+    try {
+      var d=(await api.json('GET','/resources/live-readiness')).data || {};
+      setLiveDegraded(d.ready ? [] : (d.reasons||[]));
+    } catch(e){ /* 查不到就緒狀態時不擋既有畫面（FR-24 精神） */ }
+  }
+  var liveToBatch=$('liveToBatch');
+  if(liveToBatch) liveToBatch.addEventListener('click', function(){ show('batch'); });
+
   // ══════════════════════════ 即時舞台（stub，S-06） ══════════════════════════
   var setup=$('live-setup'), stageWrap=$('live-stage-wrap');
   var timerEl=$('recTimer'), tHandle=null, tSecs=0;
   function pad(n){return (n<10?'0':'')+n;} function fmtT(s){return pad(Math.floor(s/3600))+':'+pad(Math.floor(s%3600/60))+':'+pad(s%60);}
   var startBtn=$('startStream');
-  if(startBtn) startBtn.addEventListener('click', function(){ setup.style.display='none'; stageWrap.style.display='block'; tSecs=0; timerEl.textContent=fmtT(0); tHandle=setInterval(function(){tSecs++;timerEl.textContent=fmtT(tSecs);},1000); });
+  if(startBtn) startBtn.addEventListener('click', function(){ if(!liveReady){ showToast(t('degrade.title'),'err'); return; } setup.style.display='none'; stageWrap.style.display='block'; tSecs=0; timerEl.textContent=fmtT(0); tHandle=setInterval(function(){tSecs++;timerEl.textContent=fmtT(tSecs);},1000); });
   var stopBtn=$('stopStream');
   if(stopBtn) stopBtn.addEventListener('click', function(){ if(tHandle){clearInterval(tHandle);tHandle=null;} stageWrap.style.display='none'; setup.style.display='block'; });
   var srcToggle=$('srcToggle'), stageEl=$('stage');
@@ -369,7 +408,7 @@
             if(b.dataset.act==='del'){ await api.json('DELETE','/endpoints/'+encodeURIComponent(b.dataset.id)); }
             else { await api.json('PATCH','/endpoints/'+encodeURIComponent(b.dataset.id)+'?active='+(b.dataset.active==='1'?'false':'true')); }
             loadEndpoints();
-          } catch(e){ alert(e.message||t('err.generic')); }
+          } catch(e){ showToast(e.message||t('err.generic'),'err'); }
         });
       });
     } catch(e){ if(empty){ empty.style.display='block'; empty.textContent=e.message; } }
@@ -402,4 +441,5 @@
 
   // ── init ──
   applyLang('zh');
+  checkLiveReadiness();                                   // 預設即時頁，開頁即查就緒（S-10）
 })();

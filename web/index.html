@@ -42,6 +42,16 @@
       <h1 class="ph" data-i18n="nav.live">即時翻譯</h1>
       <p class="psub" data-i18n="live.sub">中文輸入後，幾句話的時間內顯示泰文或其他翻譯語言。設定好麥克風與輸出後開始，會進入專屬即時畫面；音訊同時持續錄音。</p>
 
+      <!-- 降級橫幅（S-10）：資源不足／端點未就緒時顯示，停即時、引導手動錄音 -->
+      <div class="degrade-banner" id="liveBanner" style="display:none" role="alert">
+        <span class="db-ico" aria-hidden="true">⚠</span>
+        <div class="db-body">
+          <strong data-i18n="degrade.title">目前資源不足，已切換為手動錄音</strong>
+          <span class="db-reason" id="liveBannerReason"></span>
+        </div>
+        <button class="btn sm" id="liveToBatch" data-i18n="degrade.toBatch">改用手動錄音上傳</button>
+      </div>
+
       <div class="setup" id="live-setup">
         <h3 data-i18n="live.setupTitle">開始一場即時翻譯</h3>
         <div class="field">
@@ -334,6 +344,9 @@
     <button data-p="set"><svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.6 1.6 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.6 1.6 0 0 0-2.7 1.1V21a2 2 0 1 1-4 0v-.1A1.6 1.6 0 0 0 6.8 19l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.6 1.6 0 0 0-1.1-2.7H3a2 2 0 1 1 0-4h.1A1.6 1.6 0 0 0 4.6 6.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.6 1.6 0 0 0 1.8.3H9.2A1.6 1.6 0 0 0 10 2.6V3a2 2 0 1 1 4 0v.1"/></svg><span data-i18n="m.set">設定</span></button>
   </nav>
 </div>
+
+<!-- 統一錯誤／提示 toast（S-10） -->
+<div class="toast-wrap" id="toastWrap" aria-live="polite"></div>
 
 <script src="/i18n.js"></script>
 <script src="/app.js"></script>
