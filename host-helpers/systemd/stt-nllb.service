@@ -15,9 +15,14 @@ After=network.target
 [Service]
 Type=simple
 WorkingDirectory=%h/services
+# 關遙測（NG-1）
+Environment=HF_HUB_DISABLE_TELEMETRY=1
+Environment=DO_NOT_TRACK=1
 ExecStart=%h/.venvs/nllb/bin/uvicorn nllb_server:app --host 0.0.0.0 --port 8001
 Restart=on-failure
 RestartSec=5
+# 首次載入 fp16 權重需時（~17.6GB 權重→GPU），給足餘裕
+TimeoutStartSec=300
 
 [Install]
 WantedBy=default.target

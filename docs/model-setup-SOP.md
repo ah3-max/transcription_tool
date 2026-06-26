@@ -137,39 +137,22 @@ HF 的 `hf download` 會校驗每個 LFS 檔的 SHA256（etag）與 `model.safet
 ### C. NLLB-200-3.3B — 自寫小服務（:8001）⚠ 要自己包
 > NLLB 是**純模型、無內建 server，且非 OpenAI 相容**（用 FLORES-200 語言碼、需 `forced_bos_token_id`）。要自寫一支服務掛 :8001。語言碼：中(簡)`zho_Hans`、中(繁)`zho_Hant`、英 `eng_Latn`、泰 `tha_Thai`。
 
-1. 建 NLLB 專用 venv：
+1. 建 NLLB 專用 venv（⚠ **走 cu130 非 cu128**——S-06 實作 2026-06-26 已驗：Blackwell sm_120 在 cu128 不保證有 kernel，本機 torch 2.12.1+cu130 實測 `arch_list` 含 sm_120、matmul/softmax 實跑出數字）：
    ```bash
    uv venv ~/.venvs/nllb --python 3.12
-   uv pip install --python ~/.venvs/nllb/bin/python \
-     --index-url https://download.pytorch.org/whl/cu128 torch
-   uv pip install --python ~/.venvs/nllb/bin/python transformers fastapi uvicorn sentencepiece
+   UV_HTTP_TIMEOUT=600 uv pip install --python ~/.venvs/nllb/bin/python \
+     --index-url https://download.pytorch.org/whl/cu130 torch
+   uv pip install --python ~/.venvs/nllb/bin/python transformers fastapi uvicorn sentencepiece numpy
+   # 裝完務必比照 PoC G2 驗 sm_120：is_available()＋get_arch_list() 含 sm_120＋實跑 matmul 出數字
    ```
-2. 最小服務雛形（起點，非定稿；回應外型對齊專案 `{data,error?}`）：
-   ```python
-   # ~/services/nllb_server.py  → 啟動：~/.venvs/nllb/bin/uvicorn nllb_server:app --host 0.0.0.0 --port 8001
-   import torch
-   from fastapi import FastAPI
-   from pydantic import BaseModel
-   from transformers import AutoTokenizer, AutoModelForSeq2SeqLM
-
-   MODEL = "facebook/nllb-200-3.3B"
-   tok = AutoTokenizer.from_pretrained(MODEL)
-   model = AutoModelForSeq2SeqLM.from_pretrained(MODEL, torch_dtype=torch.float16).to("cuda").eval()
-
-   app = FastAPI()
-   class Req(BaseModel):
-       text: str
-       src_lang: str = "zho_Hans"     # 來源固定中文（一對多扇出由 app 端對每個目標各打一次，D-03）
-       tgt_lang: str                  # tha_Thai / eng_Latn ...
-
-   @app.post("/translate")
-   def translate(r: Req):
-       tok.src_lang = r.src_lang
-       enc = tok(r.text, return_tensors="pt").to("cuda")
-       out = model.generate(**enc,
-           forced_bos_token_id=tok.convert_tokens_to_ids(r.tgt_lang), max_new_tokens=512)
-       return {"data": {"translation": tok.batch_decode(out, skip_special_tokens=True)[0]}}
+2. 服務程式（**定稿在版控**）：`host-helpers/nllb_server.py`（回應外型對齊專案 `{data,error?}`、含 `/health`、語言碼白名單、惰性載入）。部署：
+   ```bash
+   mkdir -p ~/services && cp host-helpers/nllb_server.py ~/services/
+   # 啟動（或用 systemd unit stt-nllb，見 §6）：
+   #   ~/.venvs/nllb/bin/uvicorn nllb_server:app --host 0.0.0.0 --port 8001
    ```
+   實測（2026-06-26，fp16）：中→泰「早安，今天身體還好嗎？」→「สวัสดีครับ คุณรู้สึกดีไหม?」、中→英→「Good morning, how are you today?」皆正確。
+   ⚠ **VRAM 實況**：fp16 footprint ~14.6GB（非僅 6.6GB 權重，含 CUDA context／workspace）。與 ASR(~14GB) 共住會逼近 96GB；共用卡他人佔用高時 ASR 會因 free<14.25GB 起不來（D-06 按需起＋閒置釋放即為此）。要常駐／共住請轉 CT2 int8（下步）。
 3. **更快更省的替代（建議正式採用）**：CTranslate2 int8。在 host 端從官方權重本地轉換（不引第三方權重，符合 SEC-1）：
    ```bash
    uv pip install --python ~/.venvs/nllb/bin/python ctranslate2

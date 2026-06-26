@@ -1,0 +1,46 @@
+# stt-translate｜Qwen3-ASR vLLM 服務（host, :8000）— S-06 即時串流命脈，按需起
+#
+# ⚠️ 設計取捨（D-06）：GPU 模型「按需起＋閒置釋放」，不建議無腦開機常駐（故不 enable）。
+#    由 app 端 model_ctl（白名單含 stt-vllm-asr）按需 start／閒置 stop。
+#
+# 以 Qwen3ASRRealtimeGeneration 架構載同一份權重 → 同時掛載批次/SSE 與 /v1/realtime WebSocket。
+# 版本/env/啟動指令逐關證據見 docs/model-setup-SOP.md §3.B、docs/dev_log/vllm-asr-poc.md。
+#
+# ⚠️ 與既有的泛用 vllm.service 同佔 :8000——兩者不可同時起；本專案只用 stt-vllm-asr。
+#
+# 安裝：
+#   cp host-helpers/systemd/stt-vllm-asr.service ~/.config/systemd/user/
+#   systemctl --user daemon-reload
+#   # 不 enable（按需起）：systemctl --user start stt-vllm-asr
+[Unit]
+Description=stt-translate Qwen3-ASR vLLM realtime server (:8000)
+After=network.target
+
+[Service]
+Type=simple
+WorkingDirectory=%h
+# CUDA toolkit 來自 asr venv 內的 nvidia/cu13（vLLM 0.23 自帶 torch cu130）
+Environment=CUDA_HOME=%h/.venvs/asr/lib/python3.12/site-packages/nvidia/cu13
+Environment=CUDA_PATH=%h/.venvs/asr/lib/python3.12/site-packages/nvidia/cu13
+Environment=PATH=%h/.venvs/asr/lib/python3.12/site-packages/nvidia/cu13/bin:%h/.venvs/asr/bin:/usr/local/bin:/usr/bin:/bin
+# 關遙測（NG-1）
+Environment=VLLM_NO_USAGE_STATS=1
+Environment=DO_NOT_TRACK=1
+Environment=HF_HUB_DISABLE_TELEMETRY=1
+# ★關鍵：取樣器走 torch 原生，繞 flashinfer sm_120 JIT 的 CUDA 版本守衛（PoC G3）
+Environment=VLLM_USE_FLASHINFER_SAMPLER=0
+ExecStart=%h/.venvs/asr/bin/vllm serve Qwen/Qwen3-ASR-1.7B \
+    --revision 7278e1e70fe206f11671096ffdd38061171dd6e5 \
+    --hf-overrides '{"architectures":["Qwen3ASRRealtimeGeneration"]}' \
+    --gpu-memory-utilization 0.15 \
+    --kv-cache-memory-bytes 8589934592 \
+    --host 0.0.0.0 --port 8000
+# 父被 kill 後 VLLM::EngineCore 子行程會殘留佔 VRAM（§3.B 點 8）→ 收尾強殺
+ExecStopPost=/bin/sh -c 'pkill -9 -f "VLLM::EngineCore" || true'
+Restart=on-failure
+RestartSec=10
+# 首次 torch.compile + CUDA graph capture 約 37s，給足餘裕
+TimeoutStartSec=600
+
+[Install]
+WantedBy=default.target
