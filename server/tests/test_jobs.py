@@ -1,9 +1,30 @@
-"""S-04 jobs：建立/清單/單筆/刪除、加固（先驗後寫、10GB 上限）、reserve 守門。"""
+"""S-04 jobs：建立/清單/單筆/刪除、加固（先驗後寫、10GB 上限）、reserve 守門。
+S-09：API-04 匯出（依種子 transcript 產出）。"""
+import time
+
 from config import settings
+from models_db.db import db
+from storage.paths import build_path, ensure_zone, new_id
 
 
 def _wav(name="a.wav", data=b"RIFFxxxxWAVE"):
     return (name, data, "audio/wav")
+
+
+def _seed_transcript(job_id, content="# 逐字稿\n\n## 內文\n那個血壓有點高。\n", lang="zh"):
+    """為某 job 種一筆 transcript 產出（內容落 outputs 區），供匯出測試。"""
+    ensure_zone("outputs")
+    fid = new_id()
+    path = build_path("outputs", fid, ".md")
+    with open(path, "w", encoding="utf-8") as f:
+        f.write(content)
+    with db() as conn:
+        conn.execute(
+            "INSERT INTO outputs(id,ref_type,ref_id,kind,lang,fmt,path,created_at) "
+            "VALUES(?,?,?,?,?,?,?,?)",
+            ("o_" + fid, "job", job_id, "transcript", lang, "md", path, int(time.time())),
+        )
+    return "o_" + fid
 
 
 def test_create_list_get_delete(client):
@@ -75,3 +96,35 @@ def test_bad_src_lang_rejected(client):
         r = client.post("/api/jobs", files={"files": _wav()},
                         data={"src_lang": src, "out_langs": "zh"})
         assert r.status_code == 202, src
+
+
+def _make_job(client):
+    return client.post("/api/jobs", files={"files": _wav()},
+                       data={"src_lang": "zh", "out_langs": "zh"}).json()["data"]["jobs"][0]["job_id"]
+
+
+def test_export_job_transcript_md(client):
+    jid = _make_job(client)
+    _seed_transcript(jid)
+    r = client.get(f"/api/jobs/{jid}/export?fmt=md&lang=zh&kind=transcript")
+    assert r.status_code == 200
+    assert "那個血壓有點高" in r.content.decode("utf-8")
+    assert r.headers["content-disposition"].endswith(f'{jid}_transcript_zh.md"')
+
+
+def test_export_job_pdf_rejected(client):
+    jid = _make_job(client)
+    _seed_transcript(jid)
+    assert client.get(f"/api/jobs/{jid}/export?fmt=pdf").status_code == 400
+
+
+def test_export_job_no_output_404(client):
+    jid = _make_job(client)
+    assert client.get(f"/api/jobs/{jid}/export?fmt=md").status_code == 404
+
+
+def test_get_job_includes_outputs(client):
+    jid = _make_job(client)
+    oid = _seed_transcript(jid)
+    outs = client.get(f"/api/jobs/{jid}").json()["data"]["outputs"]
+    assert any(o["id"] == oid and o["kind"] == "transcript" for o in outs)

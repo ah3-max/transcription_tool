@@ -9,11 +9,12 @@ import os
 import time
 
 from fastapi import APIRouter, File, Form, HTTPException, Request, UploadFile
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, StreamingResponse
 
 from config import settings
 from models_db.db import db
 from responses import envelope
+from services import export as export_svc
 from services.resources import can_reserve
 from storage.paths import build_path, ensure_zone, new_id, safe_ext
 
@@ -152,15 +153,60 @@ def list_jobs(limit: int = 50, offset: int = 0):
     return {"data": rows, "pagination": {"total": total, "limit": limit, "offset": offset}}
 
 
+def _outputs_of(conn, job_id: str) -> list:
+    """該 job 的產出索引（供歷史下載連結，S-09）。內容路徑不外露。"""
+    rows = conn.execute(
+        "SELECT id,kind,lang,fmt,created_at FROM outputs WHERE ref_id=? ORDER BY created_at",
+        (job_id,),
+    )
+    return [{"id": r["id"], "kind": r["kind"], "lang": r["lang"],
+             "fmt": r["fmt"], "created_at": r["created_at"]} for r in rows]
+
+
 @router.get("/{job_id}")
 def get_job(job_id: str):
     with db() as conn:
         r = conn.execute("SELECT * FROM jobs WHERE job_id=?", (job_id,)).fetchone()
-    if r is None:
-        raise HTTPException(status_code=404, detail="工作不存在")
+        if r is None:
+            raise HTTPException(status_code=404, detail="工作不存在")
+        outputs = _outputs_of(conn, job_id)
     d = _job_dict(r)
     d["progress"] = {"overall_done": 0, "overall_total": 1, "current_pct": 0}  # 真值待 S-04 處理
+    d["outputs"] = outputs
     return envelope(d)
+
+
+@router.get("/{job_id}/export")
+def export_job(job_id: str, fmt: str = "docx", lang: str = "zh", kind: str = "transcript"):
+    """API-04：匯出 job 的某產出（依 lang/kind）成 docx/md/txt。檔名用 server id（SEC-3）。"""
+    with db() as conn:
+        job = conn.execute("SELECT job_id FROM jobs WHERE job_id=?", (job_id,)).fetchone()
+        if job is None:
+            raise HTTPException(status_code=404, detail="工作不存在")
+        out = conn.execute(
+            "SELECT * FROM outputs WHERE ref_id=? AND kind=? AND lang=? "
+            "ORDER BY created_at DESC LIMIT 1",
+            (job_id, kind, lang),
+        ).fetchone()
+    if out is None:
+        raise HTTPException(status_code=404, detail="尚無對應產出可匯出")
+    try:
+        with open(out["path"], "r", encoding="utf-8") as f:
+            content = f.read()
+    except OSError:
+        raise HTTPException(status_code=404, detail="產出內容已不存在")
+
+    try:
+        data, media_type, ext = export_svc.render(content, fmt)
+    except ValueError as e:
+        return _err(400, "bad_request", str(e))
+
+    filename = f"{job_id}_{kind}_{lang}.{ext}"
+    return StreamingResponse(
+        iter([data]),
+        media_type=media_type,
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+    )
 
 
 @router.delete("/{job_id}")
