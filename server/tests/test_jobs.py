@@ -62,3 +62,16 @@ def test_out_langs_required(client):
                     data={"out_langs": "klingon"})        # 無合法語言
     assert r.status_code == 400
     assert r.json()["error"] == "bad_request"
+
+
+def test_bad_src_lang_rejected(client):
+    """G1/FR-13：非法 src_lang → 400 bad_request；合法 zh_en/en → 202。"""
+    r = client.post("/api/jobs", files={"files": _wav()},
+                    data={"src_lang": "foo", "out_langs": "zh"})
+    assert r.status_code == 400
+    assert r.json()["error"] == "bad_request"
+
+    for src in ("zh_en", "en"):
+        r = client.post("/api/jobs", files={"files": _wav()},
+                        data={"src_lang": src, "out_langs": "zh"})
+        assert r.status_code == 202, src

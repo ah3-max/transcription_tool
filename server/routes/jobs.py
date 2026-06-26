@@ -20,6 +20,10 @@ from storage.paths import build_path, ensure_zone, new_id, safe_ext
 router = APIRouter(prefix="/api/jobs", tags=["jobs"])
 
 VALID_LANGS = {"zh", "en", "th"}
+# 來源辨識語言（FR-13：國語／國語＋英文／純英文）。th 不是合法來源語。
+# 前端「辨識語言」目前為 v6 雛形的 <button>（國語/國語＋英文/純英文，尚無 value、未配線）；
+# 將來前端配線時務必送這組代碼，兩邊同步（改欄位→全鏈路同步）。
+VALID_SRC = {"zh", "zh_en", "en"}
 CHUNK = 1024 * 1024
 
 
@@ -69,6 +73,8 @@ async def create_jobs(
     src_lang: str = Form("zh"),
     out_langs: str = Form("zh"),
 ):
+    if src_lang not in VALID_SRC:
+        return _err(400, "bad_request", "辨識語言不支援")
     langs = _parse_langs(out_langs)
     if not langs:
         return _err(400, "bad_request", "out_langs 至少一種（zh/en/th）")
