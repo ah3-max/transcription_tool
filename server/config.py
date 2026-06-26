@@ -26,6 +26,7 @@ class Settings(BaseSettings):
     # 政策與資源
     retention_days: int = 7
     max_file_min: int = 120
+    max_upload_gb: float = 10            # 單次上傳總量上限（GB）、防亂塞（SEC-5）；時長交切段、不在此擋
     res_cap: float = 0.8
     idle_release_min: int = 10
 

@@ -1,13 +1,14 @@
 """批次工作 jobs（S-04 API-01/03/05 骨架）。
 
-本骨架：接多檔上傳→副檔名白名單→`can_reserve` 守門(503)→以伺服器 id 落檔(uploads)→
-建 job 列(status=queued)。真正的前處理/VAD/切段/ASR 在 S-04 其餘部分；翻譯在 S-05。
+本骨架：接多檔上傳→**先驗所有副檔名**→`can_reserve` 守門(503)→串流落檔(uploads，
+累計上限 MAX_UPLOAD_GB 防亂塞)→**全部寫成功才一次入庫**(status=queued)。
+任一步失敗都不留下孤兒 job/檔。真正前處理/VAD/切段/ASR 在 S-04 其餘；翻譯 S-05。
 """
 import json
 import os
 import time
 
-from fastapi import APIRouter, File, Form, HTTPException, UploadFile
+from fastapi import APIRouter, File, Form, HTTPException, Request, UploadFile
 from fastapi.responses import JSONResponse
 
 from config import settings
@@ -19,6 +20,21 @@ from storage.paths import build_path, ensure_zone, new_id, safe_ext
 router = APIRouter(prefix="/api/jobs", tags=["jobs"])
 
 VALID_LANGS = {"zh", "en", "th"}
+CHUNK = 1024 * 1024
+
+
+def _err(status: int, error: str, message: str) -> JSONResponse:
+    return JSONResponse(status_code=status, content=envelope(error=error, message=message))
+
+
+def _cleanup(paths) -> None:
+    """best-effort 刪除暫存檔（用於失敗時不留孤兒）。"""
+    for p in paths:
+        try:
+            if p and os.path.isfile(p):
+                os.remove(p)
+        except OSError:
+            pass
 
 
 def _parse_langs(raw: str) -> list:
@@ -48,49 +64,74 @@ def _job_dict(r) -> dict:
 
 @router.post("", status_code=202)
 async def create_jobs(
+    request: Request,
     files: list[UploadFile] = File(...),
     src_lang: str = Form("zh"),
     out_langs: str = Form("zh"),
 ):
     langs = _parse_langs(out_langs)
     if not langs:
-        return JSONResponse(status_code=400, content=envelope(
-            error="bad_request", message="out_langs 至少一種（zh/en/th）"))
+        return _err(400, "bad_request", "out_langs 至少一種（zh/en/th）")
     if not files:
-        return JSONResponse(status_code=400, content=envelope(
-            error="bad_request", message="未提供檔案"))
+        return _err(400, "bad_request", "未提供檔案")
 
-    # 資源守門（SEC-5／NFR-2）：取不到回 503 並標記需降級
+    max_bytes = int(settings.max_upload_gb * 1024 ** 3)
+
+    # 1) 先驗「所有」副檔名（零副作用）——避免壞檔混入時前面已落檔留下孤兒
+    try:
+        exts = [safe_ext(f.filename or "") for f in files]
+    except ValueError:
+        return _err(400, "bad_file", "僅支援 mp3/mp4/m4a/wav")
+
+    # 2) Content-Length 若有先擋（快速拒絕），串流時再硬擋（防偽報/分塊）
+    cl = request.headers.get("content-length")
+    if cl and cl.isdigit() and int(cl) > max_bytes:
+        return _err(413, "too_large", f"上傳超過上限 {settings.max_upload_gb}GB")
+
+    # 3) 資源守門（SEC-5／NFR-2）：取不到回 503 並標記需降級
     ok, detail = can_reserve()
     if not ok:
         return JSONResponse(status_code=503, content=envelope(
             data={"degrade": True, "over": detail["over"]},
             error="resource", message="目前資源不足，請稍後再試"))
 
+    # 4) 串流落檔（累計位元組硬擋）；任何失敗都清掉本請求已寫檔、不入庫
     ensure_zone("uploads")
     now = int(time.time())
     expire = now + settings.retention_days * 86400
-    created = []
-    for f in files:
-        try:
-            ext = safe_ext(f.filename or "")
-        except ValueError:
-            return JSONResponse(status_code=400, content=envelope(
-                error="bad_file", message="僅支援 mp3/mp4/m4a/wav"))
-        fid = new_id()
-        job_id = "j_" + fid
-        path = build_path("uploads", fid, ext)  # id 命名、原檔名不入路徑（D-07/SEC-3）
-        with open(path, "wb") as out:
-            while chunk := await f.read(1024 * 1024):
-                out.write(chunk)
-        with db() as conn:
-            conn.execute(
-                "INSERT INTO jobs(job_id,original_name,zone,src_lang,out_langs,status,"
-                "created_at,expire_at,path) VALUES(?,?,?,?,?,?,?,?,?)",
-                (job_id, f.filename, "uploads", src_lang, json.dumps(langs),
-                 "queued", now, expire, path))
-        created.append({"job_id": job_id, "original_name": f.filename, "status": "queued"})
+    staged = []  # (job_id, original_name, path)
+    total = 0
+    try:
+        for f, ext in zip(files, exts):
+            fid = new_id()
+            path = build_path("uploads", fid, ext)  # id 命名、原檔名不入路徑（D-07／SEC-3）
+            with open(path, "wb") as out:
+                while chunk := await f.read(CHUNK):
+                    total += len(chunk)
+                    if total > max_bytes:
+                        out.close()
+                        _cleanup([s[2] for s in staged] + [path])
+                        return _err(413, "too_large", f"上傳超過上限 {settings.max_upload_gb}GB")
+                    out.write(chunk)
+            staged.append(("j_" + fid, f.filename, path))
+    except Exception:
+        _cleanup([s[2] for s in staged])
+        raise
 
+    # 5) 全部寫成功 → 單一交易入庫；失敗則清檔（不留孤兒）
+    try:
+        with db() as conn:
+            for job_id, original_name, path in staged:
+                conn.execute(
+                    "INSERT INTO jobs(job_id,original_name,zone,src_lang,out_langs,status,"
+                    "created_at,expire_at,path) VALUES(?,?,?,?,?,?,?,?,?)",
+                    (job_id, original_name, "uploads", src_lang, json.dumps(langs),
+                     "queued", now, expire, path))
+    except Exception:
+        _cleanup([s[2] for s in staged])
+        raise
+
+    created = [{"job_id": j, "original_name": n, "status": "queued"} for j, n, _ in staged]
     return envelope({"jobs": created})
 
 
