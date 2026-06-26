@@ -20,7 +20,7 @@
 | 文字 LLM（Gemma 31B Q8） | LM Studio（host） | 1234 | localhost 建議 | `LLM_ENDPOINT` |
 | ASR（Qwen3-ASR） | vLLM（host） | 8000 | localhost 建議 | `ASR_ENDPOINT` |
 | 即時翻譯（NLLB） | 自寫小服務（host） | 8001 | localhost 建議 | `LIVE_TR_ENDPOINT` |
-| VRAM 量測 | `host-helpers/gpu_stat.py`（host） | 3601 | `0.0.0.0`（容器要連） | —（D-17） |
+| VRAM 量測 | `host-helpers/gpu_stat.py`（host） | 3601 | docker0 閘道(自動，本機 172.17.0.1)：LAN 連不到、容器經 host.docker.internal 連得到（G2/NFR-4・SEC-9） | —（D-17） |
 
 ---
 
@@ -180,8 +180,8 @@ HF 的 `hf download` 會校驗每個 LFS 檔的 SHA256（etag）與 `model.safet
 ## 4. 啟動順序與健康檢查
 
 ```bash
-# 1) VRAM 量測服務（容器要靠它，D-17）
-GPU_STAT_PORT=3601 GPU_STAT_HOST=0.0.0.0 python3 host-helpers/gpu_stat.py &
+# 1) VRAM 量測服務（容器要靠它，D-17）；不設 GPU_STAT_HOST → 自動綁 docker0 閘道(安全，G2)
+python3 host-helpers/gpu_stat.py &
 # 2) LM Studio（:1234，常駐或 JIT）
 # 3) 需要 ASR 時才起 vLLM（:8000）；需要即時翻譯才起 NLLB（:8001）——按需起、閒置釋放（D-06）
 # 4) app（容器）

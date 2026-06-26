@@ -16,7 +16,9 @@ After=network.target
 [Service]
 Type=simple
 WorkingDirectory=%h/program/transcription_tool
-Environment=GPU_STAT_HOST=0.0.0.0
+# 不設 GPU_STAT_HOST → gpu_stat.py 自動綁 docker0 閘道(host-gateway，本機 172.17.0.1)：
+# LAN 連不到、容器經 host.docker.internal 仍連得到(G2 / NFR-4・SEC-9)。
+# 確認對應 IP：在容器內 `getent hosts host.docker.internal`，或 host `docker network inspect bridge`。
 Environment=GPU_STAT_PORT=3601
 ExecStart=/usr/bin/python3 %h/program/transcription_tool/host-helpers/gpu_stat.py
 Restart=on-failure
