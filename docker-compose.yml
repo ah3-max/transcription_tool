@@ -1,0 +1,26 @@
+# app 本體（FastAPI：UI＋API＋WS）。純 CPU 容器，不碰 nvidia-container-toolkit、
+# 不重啟 Docker daemon —— 對同主機其餘生產容器零影響（D-14）。
+# 模型在 host 原生，app 經 host.docker.internal 連出。
+services:
+  stt-app:
+    build:
+      context: .
+      dockerfile: server/Dockerfile
+    container_name: stt-app
+    ports:
+      # 本機開發 3600；內網測試環境設 APP_PORT=3610
+      - "${APP_PORT:-3600}:3600"
+    env_file: .env
+    volumes:
+      - ./data:/data          # 執行期資料（落在 host 的 2TB / 上）
+      - ./web:/web            # 開發即時更新前端
+    extra_hosts:
+      # 讓容器以 host.docker.internal 連到 host 原生的 vLLM / NLLB / LM Studio
+      - "host.docker.internal:host-gateway"
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://localhost:3600/api/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s

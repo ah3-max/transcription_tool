@@ -1,0 +1,9 @@
+# S-01 精簡依賴（鎖版：首次成功建置後以 pip freeze 產出 requirements.lock.txt）
+# 重型 ML 依賴（torch / silero-vad / deepfilternet / transformers）延到 S-04 再加，
+# 避免 S-01 映像肥大；屆時於 slim 映像驗證 CPU 前處理可行性。
+fastapi>=0.110
+uvicorn[standard]>=0.29
+python-multipart>=0.0.9
+httpx>=0.27
+pydantic-settings>=2.2
+python-docx>=1.1

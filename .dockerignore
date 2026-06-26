@@ -1,0 +1,24 @@
+# 縮小 build context：只送 server/ 與 web/ 需要的東西進映像
+.git
+.gitignore
+.dockerignore
+data/
+.env
+.env.local
+__pycache__/
+*.pyc
+.venv/
+venv/
+
+# 文件與參考資產不進映像
+*.md
+spec/
+開發紀錄/
+依循文件/
+語音轉文字工具_UI雛形_v6_愛愛院版.html
+
+# 計畫/編輯器
+.claude/
+.idea/
+.vscode/
+.DS_Store

@@ -1,0 +1,25 @@
+# 執行期資料（音檔／DB／上傳），不進版控
+data/
+*.db
+*.sqlite
+*.sqlite3
+
+# 環境變數（含端點與敏感設定）
+.env
+.env.local
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+*.egg-info/
+.pytest_cache/
+
+# 編輯器／作業系統
+.DS_Store
+.idea/
+.vscode/
+
+# Claude Code 本地設定（個人）
+.claude/settings.local.json
