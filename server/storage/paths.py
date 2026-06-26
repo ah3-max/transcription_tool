@@ -8,8 +8,8 @@ import uuid
 
 from config import settings
 
-ZONES = {"uploads", "recordings"}
-ALLOWED_EXTS = {".mp3", ".mp4", ".m4a", ".wav"}
+ZONES = {"uploads", "recordings", "outputs"}  # outputs：產出內容落地（逐字稿/翻譯/文件，S-08/S-09）
+ALLOWED_EXTS = {".mp3", ".mp4", ".m4a", ".wav"}  # 僅音檔上傳白名單；outputs 落檔自組副檔名，不經 safe_ext
 
 
 def new_id(prefix: str = "") -> str:

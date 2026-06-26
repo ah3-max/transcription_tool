@@ -19,6 +19,7 @@ from services.cleanup import sweep_expired
 from routes import endpoints as endpoints_route
 from routes import resources as resources_route
 from routes import jobs as jobs_route
+from routes import records as records_route
 
 CLEANUP_INTERVAL_SEC = 6 * 3600  # 每 6 小時掃一次到期資料（NFR-3／SEC-7）
 
@@ -85,6 +86,7 @@ async def unhandled_exception_handler(request: Request, exc: Exception) -> JSONR
 app.include_router(endpoints_route.router)
 app.include_router(resources_route.router)
 app.include_router(jobs_route.router)
+app.include_router(records_route.router)
 
 # 同源靜態服務 web/（html=True 讓根網址載入 index.html）。掛在所有 /api、/ws 之後。
 app.mount("/", StaticFiles(directory=settings.web_dir, html=True), name="web")
