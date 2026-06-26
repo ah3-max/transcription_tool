@@ -1,0 +1,335 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>語音轉文字與即時翻譯工具 — 愛愛院版 v6（深色可切換）</title>
+<link rel="stylesheet" href="/styles/tokens.css">
+</head>
+<body>
+<div class="app">
+
+  <aside class="side">
+    <div class="brand"><img class="brand-logo" src="data:image/png;base64,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" alt="愛愛院"><div><b data-i18n="brand">語音轉文字</b><small>愛愛院 · STT</small></div></div>
+    <nav class="nav" id="nav">
+      <button class="on" data-p="live"><svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3z"/><path d="M5 10v2a7 7 0 0 0 14 0v-2M12 19v3"/></svg><span data-i18n="nav.live">即時翻譯</span></button>
+      <button data-p="rec"><svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="3"/></svg><span data-i18n="nav.rec">錄音記錄</span></button>
+      <button data-p="batch"><svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6M8 13h8M8 17h6"/></svg><span data-i18n="nav.batch">批次逐字稿</span></button>
+      <button data-p="gen"><svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 4h16v16H4z"/><path d="M8 9h8M8 13h8M8 17h5"/></svg><span data-i18n="nav.gen">文件生成</span></button>
+      <button data-p="set"><svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19 12a7 7 0 0 0-.1-1l2-1.6-2-3.4-2.4 1a7 7 0 0 0-1.7-1L14.5 2h-5l-.3 2.9a7 7 0 0 0-1.7 1l-2.4-1-2 3.4 2 1.6a7 7 0 0 0 0 2l-2 1.6 2 3.4 2.4-1a7 7 0 0 0 1.7 1l.3 2.9h5l.3-2.9a7 7 0 0 0 1.7-1l2.4 1 2-3.4-2-1.6c.1-.3.1-.7.1-1z"/></svg><span data-i18n="nav.set">一般設定</span></button>
+    </nav>
+  </aside>
+
+  <header class="top">
+    <div class="crumb" id="crumb">即時翻譯</div>
+    <div class="spacer"></div>
+    <div class="res" id="res">
+      <div class="meter"><span class="mlbl">VRAM</span><div class="track"><i style="width:34%"></i></div><span class="mpct">34%</span></div>
+      <div class="meter"><span class="mlbl">RAM</span><div class="track"><i class="hot" style="width:61%"></i></div><span class="mpct">61%</span></div>
+    </div>
+    <div class="top-divider"></div>
+    <div class="top-ctrls">
+      <div class="dd-wrap lang-wrap"><select class="dd dd-sm" id="uiLang" title="介面語言"><option value="zh">中文</option><option value="en">English</option><option value="th">ไทย</option></select></div>
+      <button class="icon-btn" id="themeToggle" title="深色／淺色" aria-label="theme"></button>
+      <button class="icon-btn" id="resToggle" title="隱藏／顯示資源用量" aria-label="resource"></button>
+    </div>
+  </header>
+
+  <main class="main">
+
+    <!-- 即時翻譯 -->
+    <section class="panel on" id="p-live">
+      <h1 class="ph" data-i18n="nav.live">即時翻譯</h1>
+      <p class="psub" data-i18n="live.sub">中文輸入後，幾句話的時間內顯示泰文或其他翻譯語言。設定好麥克風與輸出後開始，會進入專屬即時畫面；音訊同時持續錄音。</p>
+
+      <div class="setup" id="live-setup">
+        <h3 data-i18n="live.setupTitle">開始一場即時翻譯</h3>
+        <div class="field">
+          <label data-i18n="live.mic">麥克風來源</label>
+          <div class="dd-wrap"><select class="dd"><option>iPhone 17 Air</option><option>MacBook M3 Pro</option><option>iPhone 15 Pro</option></select></div>
+        </div>
+        <div class="field">
+          <label data-i18n="live.inLang">輸入語言</label>
+          <div class="dd-wrap"><select class="dd"><option data-i18n="lang.zh">中文</option><option selected data-i18n="lang.zhen">中文 ＋ 英文</option><option data-i18n="lang.enonly">純英文</option></select></div>
+        </div>
+        <div class="field">
+          <label data-i18n="live.outLang">輸出翻譯語言（可複選）</label>
+          <div>
+            <span class="chk on"><span class="box"></span><span data-i18n="lang.th">泰文</span></span>
+            <span class="chk on"><span class="box"></span><span data-i18n="lang.en">英文</span></span>
+            <span class="chk"><span class="box"></span><span data-i18n="lang.zh">中文</span></span>
+          </div>
+          <p class="hint" data-i18n="live.outHint">每多選一種語言，背後會多跑一次翻譯。</p>
+        </div>
+        <button class="btn rec" id="startStream"><span style="width:9px;height:9px;border-radius:50%;background:#fff;display:inline-block"></span><span data-i18n="live.start">開始串流並錄音</span></button>
+      </div>
+
+      <div id="live-stage-wrap" style="display:none">
+        <div class="stage" id="stage">
+          <div class="stage-top">
+            <span class="live-badge"><span class="recdot"></span>REC&nbsp;<span id="recTimer">00:00:00</span></span>
+            <button class="src-toggle" id="srcToggle"></button>
+          </div>
+          <div class="stage-main" id="stageMain">
+            <div class="scap dim"><p class="s-primary" data-th="ผู้ป่วยรายนั้นความดันเช้านี้ค่อนข้างสูง เราจะเฝ้าดูก่อน" data-en="The patient's blood pressure was a bit high this morning; let's observe first.">ผู้ป่วยรายนั้นความดันเช้านี้ค่อนข้างสูง เราจะเฝ้าดูก่อน</p><p class="s-src">那個 patient 的血壓今天早上有點偏高，我們先觀察。</p></div>
+            <div class="scap"><p class="s-primary" data-th="ประชุมช่วงบ่ายเลื่อนเป็นบ่ายสามโมง อย่าลืมแจ้งญาติ" data-en="The afternoon meeting moves to 3 PM; remember to notify the family.">ประชุมช่วงบ่ายเลื่อนเป็นบ่ายสามโมง อย่าลืมแจ้งญาติ</p><p class="s-src">下午的 meeting 改到三點，記得通知家屬。</p></div>
+            <div class="scap draft"><p class="s-primary" data-th="กำลังแปล…" data-en="Translating…">กำลังแปล…</p><p class="s-src">接下來我們確認一下這週的排班…</p></div>
+            <button class="jump" data-i18n="live.jump">↓ 回到最新</button>
+          </div>
+          <aside class="stage-side">
+            <h5 data-i18n="live.srcLabel">辨識原文</h5>
+            <p class="sline"><span class="ts">14:30</span>那個 patient 的血壓今天早上有點偏高，我們先觀察。</p>
+            <p class="sline"><span class="ts">14:31</span>下午的 meeting 改到三點，記得通知家屬。</p>
+            <p class="sline draft"><span class="ts">14:32</span>接下來我們確認一下這週的排班…</p>
+          </aside>
+        </div>
+        <div class="ctrlbar">
+          <div class="grp"><span class="mic-dot"></span><div class="dd-wrap"><select class="dd dd-sm"><option>iPhone 17 Air</option><option>MacBook M3 Pro</option></select></div></div>
+          <div class="wave" aria-hidden="true"></div>
+          <div class="grp"><span class="lbl" data-i18n="live.showLbl">顯示</span><div class="dd-wrap"><select class="dd dd-sm" id="outLang"><option value="th" data-i18n="lang.th">泰文</option><option value="en" data-i18n="lang.en">英文</option></select></div></div>
+          <div class="grp"><button class="tool stage-font" data-d="down">A−</button><button class="tool stage-font" data-d="up">A＋</button><button class="tool" data-i18n="live.project" title="全螢幕投影">⤢</button></div>
+          <div class="spacer"></div>
+          <button class="btn rec sm" id="stopStream"><span data-i18n="live.stop">■ 停止並儲存</span></button>
+        </div>
+        <p class="hint" data-i18n="live.note">停止後，本場錄音會保留在「錄音記錄」，可在那裡重新翻譯或產生摘要。</p>
+      </div>
+    </section>
+
+    <!-- 錄音記錄 -->
+    <section class="panel" id="p-rec">
+      <h1 class="ph" data-i18n="nav.rec">錄音記錄</h1>
+      <p class="psub" data-i18n="rec.sub">即時翻譯時的錄音會保留在這裡，以語音輸入為主。可重新翻譯、產生摘要、匯出或下載原始音檔。保留 7 天。</p>
+
+      <div class="card">
+        <h3><span data-i18n="rec.listTitle">錄音列表</span> <span class="tag">3</span></h3>
+        <div class="ses"><div class="nm">交班會議 0624<small>2026-06-24 09:00 · 32 min</small></div><span class="meta" data-i18n="rec.transcribed">已轉逐字稿</span><div class="act"><span class="chip locked" style="font-size:10px" data-i18n="rec.opened">開啟中</span></div></div>
+        <div class="ses"><div class="nm">週會 0623<small>2026-06-23 14:00 · 48 min</small></div><span class="meta" data-i18n="rec.transcribed">已轉逐字稿</span><div class="act"><button class="ic" data-i18n="act.open">開啟</button><button class="ic" data-i18n="act.dlAudio">下載音檔</button></div></div>
+        <div class="ses"><div class="nm">個案討論 0619<small>2026-06-19 11:00 · 26 min</small></div><span class="meta" style="color:var(--warn)" data-i18n="rec.expSoon">明天到期</span><div class="act"><button class="ic" data-i18n="act.open">開啟</button><button class="ic" data-i18n="act.dlAudio">下載音檔</button></div></div>
+      </div>
+
+      <div class="card">
+        <h3>交班會議 0624 <span class="tag" data-i18n="rec.recOut">錄音產出</span></h3>
+        <div class="seg" id="recTabs" style="margin-bottom:14px"><button class="on" data-rt="t" data-i18n="rec.tabTranscript">逐字稿</button><button data-rt="s" data-i18n="rec.tabSummary">摘要</button></div>
+        <div id="recTranscript">
+          <div class="preview"><div class="docpage">
+            <h1>交班會議 0624 — 逐字稿</h1><p class="docmeta">2026-06-24 09:00 · 中文</p>
+            <p><span class="tsd">00:00</span>那個 patient 的血壓今天早上有點偏高，我們先觀察。</p>
+            <p><span class="tsd">00:31</span>下午的 meeting 改到三點，記得通知家屬。</p>
+            <p><span class="tsd">00:58</span>接下來我們確認一下這週的排班，日班先頂上。</p>
+          </div></div>
+        </div>
+        <div id="recSummary" style="display:none">
+          <div class="loading-wrap" id="recLoading"><div class="spinner"></div><p class="loading-txt" data-i18n="rec.summarizing">統整中…</p></div>
+          <div id="recSummaryContent" style="display:none"><div class="preview"><div class="docpage">
+            <h1>交班會議 0624 — 摘要</h1><p class="docmeta" data-i18n="rec.byModel">由後處理模型統整</p>
+            <ul><li>一名住民今晨血壓偏高，採觀察處置。</li><li>下午會議改至三點，需通知家屬。</li><li>本週排班由日班優先支援。</li></ul>
+          </div></div></div>
+        </div>
+        <div class="export-bar">
+          <div class="export-grp">
+            <span class="exp-lbl" data-i18n="exp.fmt">輸出格式</span>
+            <div class="dd-wrap"><select class="dd dd-sm"><option>.docx</option><option>.md</option><option>.txt</option></select></div>
+            <button class="btn primary sm" data-i18n="exp.do">匯出</button>
+          </div>
+          <div class="export-grp">
+            <button class="btn ghost sm" data-i18n="act.dlAudio">下載音檔</button>
+            <button class="btn ghost sm" data-i18n="rec.retranslate">重新翻譯</button>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- 批次逐字稿 -->
+    <section class="panel" id="p-batch">
+      <h1 class="ph" data-i18n="nav.batch">批次逐字稿</h1>
+      <p class="psub" data-i18n="batch.sub">上傳音檔，產生逐字稿與翻譯。</p>
+
+      <div class="seg seg-top" id="batchMode"><button class="on" data-bm="new" data-i18n="batch.new">新增轉入</button><button data-bm="hist" data-i18n="batch.hist">歷史記錄</button></div>
+
+      <div id="batch-new">
+        <div class="card"><div class="drop" id="batchDrop"><b data-i18n="batch.drop">把音檔拖進來，或點擊上傳</b><span data-i18n="batch.dropSub">可同時上傳多個檔案</span><div class="fmt">mp3 · mp4 · m4a · wav</div></div><p class="muted" id="batchFiles" style="margin:10px 0 0"></p></div>
+
+        <div class="card">
+          <h3 data-i18n="batch.optTitle">處理選項</h3>
+          <div class="field"><label data-i18n="batch.asrLang">辨識語言</label>
+            <div class="seg" id="batchSrcSeg"><button class="on" data-src="zh" data-i18n="lang.mandarin">國語</button><button data-src="zh_en" data-i18n="lang.mandarinEn">國語 ＋ 英文</button><button data-src="en" data-i18n="lang.enonly">純英文</button></div>
+          </div>
+          <div class="field"><label data-i18n="batch.outScope">輸出範圍（可複選，可單選或多選）</label>
+            <div id="batchOutChk"><span class="chk on" data-lang="zh"><span class="box"></span><span data-i18n="lang.zh">中文</span></span><span class="chk" data-lang="en"><span class="box"></span><span data-i18n="lang.en">英文</span></span><span class="chk" data-lang="th"><span class="box"></span><span data-i18n="lang.th">泰文</span></span></div>
+          </div>
+          <button class="btn primary" id="batchSubmit" data-i18n="batch.enqueue">加入佇列開始處理</button>
+          <p class="muted" id="batchMsg" style="margin:10px 0 0"></p>
+        </div>
+
+        <div class="card">
+          <div class="collap-head"><h3 style="margin:0"><span data-i18n="batch.progTitle">處理進度</span> <span class="tag">3 / 8</span></h3><button class="collap-btn" id="progBtn" data-i18n="batch.collapse">收折 ▴</button></div>
+          <div class="overall"><span data-i18n="batch.overall">整體進度</span><div class="bar" style="max-width:none"><i style="width:38%"></i></div><span class="muted" data-i18n="batch.nOfm">第 3 檔 / 共 8 檔</span></div>
+          <div id="progDetail" style="margin-top:6px">
+            <div class="qrow"><div class="qname">交班會議_0624.m4a<small>01:12:40</small></div><div class="barwrap"><div class="bar"><i style="width:67%"></i></div></div><span class="st run">67%</span></div>
+            <div class="qrow"><div class="qname">週會_0623.mp3<small>00:48:15</small></div><div class="barwrap"><div class="bar"><i style="width:100%"></i></div></div><span class="st done" data-i18n="st.done">已完成</span></div>
+            <div class="qrow"><div class="qname">個案討論_0622.wav<small data-i18n="st.waiting">等待中</small></div><div class="barwrap"><div class="bar"><i style="width:0%"></i></div></div><span class="st wait" data-i18n="st.wait">等待</span></div>
+          </div>
+        </div>
+
+        <div class="card">
+          <h3><span data-i18n="batch.resultTitle">結果預覽</span> <span class="tag">週會_0623</span></h3>
+          <div class="pv-toolbar">
+            <div class="pv-fmt" id="batchLang"><button class="on" data-bl="zh" data-i18n="batch.zhDoc">中文逐字稿</button><button data-bl="th" data-i18n="batch.thDoc">泰文翻譯</button></div>
+            <div class="pv-fmt" id="batchFmt"><button class="on" data-fmt="doc" data-i18n="fmt.doc">文件</button><button data-fmt="md">Markdown</button><button data-fmt="txt">.txt</button></div>
+            <span class="muted" data-i18n="pv.note">預覽即為產出檔的格式與樣式</span>
+          </div>
+          <div class="preview">
+            <div class="docpage fmt-doc" id="batchZh">
+              <h1>週會逐字稿</h1><p class="docmeta">2026-06-23 · 中文</p>
+              <p><span class="tsd">00:02</span>主席：我們先看上週的入住人數。</p>
+              <p><span class="tsd">00:07</span>護理長：這週新增三位，其中一位需要 follow-up。</p>
+              <p><span class="tsd">00:15</span>主席：好，那 follow-up 排給日班。</p>
+            </div>
+            <div class="docpage fmt-doc" id="batchTh" style="display:none">
+              <h1>บันทึกการประชุม</h1><p class="docmeta">2026-06-23 · ไทย</p>
+              <p><span class="tsd">00:02</span>ประธาน: มาดูจำนวนผู้เข้าพักสัปดาห์ที่แล้วก่อน</p>
+              <p><span class="tsd">00:07</span>หัวหน้าพยาบาล: สัปดาห์นี้เพิ่มสามราย หนึ่งรายต้องติดตามผล</p>
+              <p><span class="tsd">00:15</span>ประธาน: โอเค งานติดตามผลมอบให้เวรกลางวัน</p>
+            </div>
+          </div>
+          <div class="export-bar">
+            <div class="export-grp">
+              <span class="exp-lbl" data-i18n="exp.fmt">輸出格式</span>
+              <div class="dd-wrap"><select class="dd dd-sm"><option>.docx</option><option>.md</option><option>.txt</option></select></div>
+              <button class="btn primary sm" data-i18n="exp.do">匯出</button>
+            </div>
+            <span class="muted" data-i18n="batch.dlNote">可分檔或整合下載</span>
+          </div>
+        </div>
+      </div>
+
+      <div id="batch-hist" style="display:none">
+        <div class="card">
+          <h3><span data-i18n="batch.hist">歷史記錄</span> <span class="tag" id="histCount">0</span></h3>
+          <div id="histList"></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- 文件生成 -->
+    <section class="panel" id="p-gen">
+      <h1 class="ph" data-i18n="nav.gen">文件生成</h1>
+      <p class="psub" data-i18n="gen.sub">把已是逐字稿的內容依範本整理成會議記錄或護理交班。</p>
+
+      <div class="card">
+        <h3 data-i18n="gen.srcTitle">來源</h3>
+        <div class="seg" id="genSrc" style="margin-bottom:14px"><button class="on" data-gs="pick" data-i18n="gen.pick">選擇來源</button><button data-gs="up" data-i18n="gen.manual">手動上傳</button></div>
+        <div id="gen-pick">
+          <div class="field"><label data-i18n="gen.srcLabel">選擇逐字稿來源</label>
+            <div class="dd-wrap"><select class="dd dd-wide" id="genSrcSelect">
+              <optgroup data-i18ngrp="nav.rec" label="錄音記錄"></optgroup>
+              <optgroup data-i18ngrp="nav.batch" label="批次逐字稿"></optgroup>
+            </select></div>
+            <p class="hint" data-i18n="gen.srcHint">來源需已是逐字稿；錄音記錄與批次逐字稿的產出都會出現在這裡。</p>
+          </div>
+        </div>
+        <div id="gen-up" style="display:none"><div class="drop" id="genUpDrop"><b data-i18n="gen.upTitle">上傳逐字稿檔</b><span data-i18n="gen.upSub">手動帶入已整理好的逐字稿</span><div class="fmt">txt · md · docx</div></div><p class="muted" id="genUpName" style="margin:10px 0 0"></p></div>
+      </div>
+
+      <div class="card">
+        <h3 data-i18n="gen.tplTitle">選擇範本</h3>
+        <div class="seg" id="genTpl" style="display:flex"><button class="on" data-tpl="meet" data-i18n="gen.tplMeet">一般會議記錄</button><button data-tpl="care" data-i18n="gen.tplCare">護理交班</button><button data-tpl="up" data-i18n="gen.tplUp">＋ 上傳自訂範本</button></div>
+        <div id="gen-tpl-up" style="display:none;margin-top:12px"><div class="drop" id="genTplDrop"><b data-i18n="gen.tplUpTitle">上傳範本檔</b><span data-i18n="gen.tplUpSub">拖曳到這裡，或從本機選取</span><div class="fmt">md · docx</div></div><p class="muted" id="genTplName" style="margin:10px 0 0"></p></div>
+        <p class="hint" data-i18n="gen.tplHint">會議記錄與護理交班欄位不同；選「上傳自訂範本」可帶入你機構的格式。</p>
+        <button class="btn primary" style="margin-top:8px" id="genBtn" data-i18n="gen.generate">依範本生成</button>
+        <p class="muted" id="genMsg" style="margin:10px 0 0"></p>
+      </div>
+
+      <div class="card">
+        <h3><span data-i18n="gen.previewTitle">輸出預覽</span> <span class="tag" id="genTag">一般會議記錄</span></h3>
+        <div class="pv-toolbar">
+          <div class="pv-fmt" id="genFmt"><button class="on" data-fmt="doc" data-i18n="fmt.doc">文件</button><button data-fmt="md">Markdown</button><button data-fmt="txt">.txt</button></div>
+          <span class="muted" data-i18n="pv.note">預覽即為產出檔的格式與樣式</span>
+        </div>
+        <div class="preview">
+          <!-- 範本結構示意（生成前）；生成後填入 #genResult 並顯示真實內容 -->
+          <div class="docpage fmt-doc" id="genDocMeet">
+            <h1>長照中心週會 會議記錄</h1><p class="docmeta">2026-06-23 14:00–14:48 · 主席、護理長、日班代表</p>
+            <h2>討論事項</h2><ul><li>上週入住人數回顧。</li><li>本週新增三位住民，其中一位需後續追蹤。</li></ul>
+            <h2>決議</h2><p>追蹤工作指派日班負責。</p>
+            <h2>待辦</h2><p>通知相關家屬下午會議改期。</p>
+          </div>
+          <div class="docpage fmt-doc" id="genDocCare" style="display:none">
+            <h1>護理交班記錄</h1><p class="docmeta">2026-06-24 · 日班 → 夜班</p>
+            <h2>住民狀況</h2><ul><li>301 床血壓偏高，已通知醫師，持續監測。</li><li>305 床進食量下降，需留意水分。</li></ul>
+            <h2>用藥與處置</h2><p>依醫囑調整降壓藥，夜間追蹤血壓一次。</p>
+            <h2>注意事項</h2><p>家屬下午三點來訪，先行知會。</p>
+            <h2>待追蹤</h2><p>明早回報 301 床血壓變化。</p>
+          </div>
+          <div class="docpage fmt-doc" id="genResult" style="display:none;white-space:pre-wrap"></div>
+        </div>
+        <div class="export-bar">
+          <div class="export-grp">
+            <span class="exp-lbl" data-i18n="exp.fmt">輸出格式</span>
+            <div class="dd-wrap"><select class="dd dd-sm" id="genExportFmt"><option value="docx">.docx</option><option value="md">.md</option><option value="txt">.txt</option></select></div>
+            <button class="btn primary sm" id="genExportBtn" data-i18n="exp.do">匯出</button>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- 一般設定 -->
+    <section class="panel" id="p-set">
+      <h1 class="ph" data-i18n="nav.set">一般設定</h1>
+      <p class="psub" data-i18n="set.sub">逐接點選用模型、可新增端點；資源動態取用、閒置釋放。</p>
+
+      <div class="card">
+        <h3><span data-i18n="set.routeTitle">模型路由</span> <span class="tag" data-i18n="set.routeTag">每功能可換</span></h3>
+        <table class="route">
+          <thead><tr><th data-i18n="set.thFn">功能接點</th><th data-i18n="set.thModel">目前模型</th><th data-i18n="set.thEp">端點</th><th></th></tr></thead>
+          <tbody id="epTable"></tbody>
+        </table>
+        <p class="muted" id="epEmpty" data-i18n="set.epEmpty" style="margin:10px 0 0">尚未設定任何端點，點下方新增。</p>
+        <button class="btn ghost sm" style="margin-top:12px" id="addEpBtn" data-i18n="set.addEp">＋ 新增端點</button>
+        <div class="ep-form" id="addEpForm" style="display:none">
+          <div class="field"><label data-i18n="set.epName">端點名稱</label><input class="inp" id="epName" placeholder="翻譯-NLLB"></div>
+          <div class="field"><label data-i18n="set.epUrl">服務網址</label><input class="inp" id="epUrl" placeholder="http://localhost:8003/v1"></div>
+          <div class="field"><label data-i18n="set.epModel">模型名稱</label><input class="inp" id="epModel" placeholder="facebook/nllb-200-3.3B"></div>
+          <div class="field"><label data-i18n="set.epFn">這個端點處理什麼功能？</label>
+            <div class="dd-wrap"><select class="dd" id="epFn"><option value="asr" data-i18n="fn.asr">ASR 辨識</option><option value="batch_tr" data-i18n="fn.btr">批次翻譯</option><option value="live_tr" data-i18n="fn.rtr">即時翻譯</option><option value="post" data-i18n="fn.post">後處理 · 摘要</option></select></div>
+            <p class="hint" data-i18n="set.epHint">選好功能後，該功能就能在上面的模型路由切換到這個端點。</p>
+          </div>
+          <div class="row2"><button class="btn primary sm" id="epSave" data-i18n="set.epSave">儲存端點</button><button class="btn ghost sm" id="cancelEp" data-i18n="set.cancel">取消</button></div>
+          <p class="muted" id="epMsg" style="margin:8px 0 0"></p>
+        </div>
+      </div>
+
+      <div class="card">
+        <h3 data-i18n="set.resTitle">資源管理</h3>
+        <div class="tg"><div><div class="t" data-i18n="set.dyn">動態取用上限 80%</div><div class="d" data-i18n="set.dynD">啟動工作時查當下可用量，一次保留有上限的定額，不一次全佔，與其他專案共存。</div></div><button class="switch" aria-label="on"><i></i></button></div>
+        <div class="tg"><div><div class="t" data-i18n="set.idle">閒置釋放顯卡</div><div class="d" data-i18n="set.idleD">超過閒置時間自動卸載模型還回顯卡；下次使用時重新載入。</div></div><button class="switch" aria-label="on"><i></i></button></div>
+        <div class="tg"><div><div class="t" data-i18n="set.idleT">閒置時間</div><div class="d" data-i18n="set.idleTD">無工作達此時間即釋放。</div></div><span class="sel">10 min</span></div>
+        <div class="tg"><div><div class="t" data-i18n="set.degrade">資源不足時的即時翻譯行為</div><div class="d" data-i18n="set.degradeD">無法配置資源做即時翻譯時，提醒改手動錄音、停止提供即時服務。</div></div><span class="sel" data-i18n="set.degradeV">提醒並停止</span></div>
+      </div>
+
+      <div class="card">
+        <h3 data-i18n="set.uiLangTitle">介面語言</h3>
+        <div class="tg"><div><div class="t" data-i18n="set.dispLang">顯示語言</div><div class="d" data-i18n="set.dispLangD">切換介面語言；泰文／英文字串較長，版面會依語言調整或改用較短的詞。</div></div><div class="dd-wrap"><select class="dd dd-sm" id="uiLang2"><option value="zh">中文</option><option value="en">English</option><option value="th">ไทย</option></select></div></div>
+      </div>
+
+      <div class="card">
+        <h3 data-i18n="set.retTitle">保留政策</h3>
+        <div class="tg"><div><div class="t" data-i18n="set.ret">錄音、逐字稿與產出保留</div><div class="d" data-i18n="set.retD">各功能的產出分別存放於該功能頁，到期自動清除。</div></div><span class="sel">7 days</span></div>
+      </div>
+    </section>
+
+  </main>
+
+  <nav class="mnav" id="mnav">
+    <button class="on" data-p="live"><svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3z"/><path d="M5 10v2a7 7 0 0 0 14 0v-2"/></svg><span data-i18n="m.live">即時</span></button>
+    <button data-p="rec"><svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="3"/></svg><span data-i18n="m.rec">錄音</span></button>
+    <button data-p="batch"><svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/></svg><span data-i18n="m.batch">批次</span></button>
+    <button data-p="gen"><svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 4h16v16H4z"/><path d="M8 9h8M8 13h6"/></svg><span data-i18n="m.gen">生成</span></button>
+    <button data-p="set"><svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.6 1.6 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.6 1.6 0 0 0-2.7 1.1V21a2 2 0 1 1-4 0v-.1A1.6 1.6 0 0 0 6.8 19l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.6 1.6 0 0 0-1.1-2.7H3a2 2 0 1 1 0-4h.1A1.6 1.6 0 0 0 4.6 6.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.6 1.6 0 0 0 1.8.3H9.2A1.6 1.6 0 0 0 10 2.6V3a2 2 0 1 1 4 0v.1"/></svg><span data-i18n="m.set">設定</span></button>
+  </nav>
+</div>
+
+<script src="/i18n.js"></script>
+<script src="/app.js"></script>
+</body>
+</html>
