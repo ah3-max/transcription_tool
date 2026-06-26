@@ -1,0 +1,26 @@
+# stt-translate｜GPU VRAM 量測服務（host helper，:3601，D-17）
+# user 級 systemd 服務（免 sudo）。本機 Linger=yes 已開 → 開機即起、免登入。
+#
+# 安裝：
+#   mkdir -p ~/.config/systemd/user
+#   cp host-helpers/systemd/stt-gpu-stat.service ~/.config/systemd/user/
+#   systemctl --user daemon-reload
+#   systemctl --user enable --now stt-gpu-stat
+#   systemctl --user status stt-gpu-stat
+#
+# gpu_stat.py 只用 stdlib（讀 nvidia-smi），故用系統 python3 即可，不需 venv。
+[Unit]
+Description=stt-translate GPU VRAM stat (host helper, :3601)
+After=network.target
+
+[Service]
+Type=simple
+WorkingDirectory=%h/program/transcription_tool
+Environment=GPU_STAT_HOST=0.0.0.0
+Environment=GPU_STAT_PORT=3601
+ExecStart=/usr/bin/python3 %h/program/transcription_tool/host-helpers/gpu_stat.py
+Restart=on-failure
+RestartSec=3
+
+[Install]
+WantedBy=default.target

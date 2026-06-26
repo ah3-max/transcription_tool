@@ -1,0 +1,23 @@
+# stt-translate｜NLLB 即時翻譯服務（host，:8001）— 範本，預設不啟用
+#
+# ⚠️ 設計取捨（D-06）：GPU 模型設計為「按需起＋閒置釋放」，不建議無腦開機常駐。
+#    NLLB 若走 CTranslate2 int8（~3.4GB，成本低）才較適合常駐；fp16（~6.6GB）請斟酌。
+#    ASR/vLLM 不放這裡（按需起；且 Blackwell PoC 由他人負責）。
+#
+# 前提：已建 ~/.venvs/nllb 並備好服務程式（見 docs/model-setup-SOP.md §3.C）。
+# 安裝（同 gpu-stat 流程）：
+#   cp host-helpers/systemd/stt-nllb.service ~/.config/systemd/user/
+#   systemctl --user daemon-reload && systemctl --user enable --now stt-nllb
+[Unit]
+Description=stt-translate NLLB live-translation service (:8001)
+After=network.target
+
+[Service]
+Type=simple
+WorkingDirectory=%h/services
+ExecStart=%h/.venvs/nllb/bin/uvicorn nllb_server:app --host 0.0.0.0 --port 8001
+Restart=on-failure
+RestartSec=5
+
+[Install]
+WantedBy=default.target
