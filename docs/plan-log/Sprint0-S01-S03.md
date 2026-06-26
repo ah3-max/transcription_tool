@@ -29,7 +29,7 @@
 - 為什麼：以 id 命名＋SQLite 索引可避免撞名與路徑穿越（D-07、SEC-3）；原檔名只存 DB 供顯示、永不進路徑；7 天清除對應 NFR-3、SEC-7。
 
 **S-03 模型路由 + 資源動態管理**
-- 怎麼改：endpoints CRUD（API-11，function ∈ asr / batch_tr / live_tr / post，active 旗標）；OpenAI 相容 client（httpx）；資源管理模組 `server/services/resources.py`：啟動工作→查可用量（RAM／儲存用 psutil 實量、VRAM 有 pynvml 就量）→reserve 不超過 `RES_CAP`(80%)→閒置 `IDLE_RELEASE_MIN` 分鐘 unload；取不到資源回 503 並標記需降級。
+- 怎麼改：endpoints CRUD（API-11，function ∈ asr / batch_tr / live_tr / post，active 旗標）；OpenAI 相容 client（httpx）；資源管理模組 `server/services/resources.py`：啟動工作→查可用量（RAM 用 psutil、儲存用 `shutil.disk_usage`，**VRAM 改由 host `gpu_stat` 端點查**——app 在 CPU 容器量不到、pynvml 不可行，見 D-17）→reserve 不超過 `RES_CAP`(80%)→取不到資源回 503 並標記需降級。GPU reserve 交 vLLM 啟動參數 `gpu_memory_utilization`、閒置 unload 屬 host 端（整合待 S-06）。新增 `host-helpers/gpu_stat.py`（stdlib、讀 nvidia-smi、:3601、僅內網/橋接）供 app 與 FR-24 顯示用。
 - 為什麼：動態 reserve＋閒置釋放對共用 VM 友善（D-06、NFR-1）；上限納管 VRAM+RAM+儲存，RAM 是相對小的池要防耗盡（SEC-5）；解耦路由讓翻譯/主 LLM 各自切端點（FR-21/22、D-03）。
 
 ### 4. 範圍邊界（這次做 / 不做）
@@ -50,10 +50,10 @@
 - [x] 到期工作連檔帶記錄被清除 ✅（`sweep_expired` 刪檔＋刪列）
 
 **S-03**
-- [ ] 可新增/停用端點、切換某功能目標端點
-- [ ] 啟動工作只取定額、不超 80% 上限
-- [ ] 閒置逾時自動釋放、下次重載（邏輯；整合待端點）
-- [ ] 取不到資源回 503 並標記需降級
+- [x] 可新增/停用端點、切換某功能目標端點 ✅（CRUD＋active 旗標；驗 build/list/patch/delete）
+- [x] 啟動工作只取定額、不超 80% 上限 ✅（`can_reserve` 對 RAM/儲存以 RES_CAP 守門；接 S-04 起工作）
+- [~] 閒置逾時自動釋放、下次重載 — GPU 部分交 vLLM/host（D-17），整合待 S-06
+- [x] 取不到資源回 503 並標記需降級 ✅（`can_reserve`→False 時回 503；實際 wiring 於 S-04）
 
 **里程碑**
 - [ ] 三條 curl（建立工作 / 查清單 / 設定端點）皆通

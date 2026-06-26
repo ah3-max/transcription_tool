@@ -22,3 +22,11 @@
 - 又怎麼改：改用正規 `with db() as c:` 重驗。
 - 最後如何解決：**S-02 驗證通過**——四表建立；路徑穿越三案（`../../etc/passwd`、非法副檔名、未知 zone）全擋；插入到期 job→`sweep_expired` 刪檔＋刪列（jobs 1→0、uploads 清空）；`index.db` 落在 `/data`。
 - 待續／提醒：實際上傳落檔屬 S-04。**S-03（端點 CRUD＋資源管理）有設計變更**：app 在 CPU 容器內**無法直接量 VRAM**（pynvml 需 GPU），原規劃的 in-process 量測不可行；VRAM 量測須改走 host 途徑，動工前先與使用者確認方案（見下次規劃）。
+
+**③ 2026-06-26｜S-03 模型路由端點 CRUD ＋ 資源動態管理（含 host gpu_stat）**
+- 原本：無端點管理、無資源量測。
+- 改了什麼：① 新增 host `host-helpers/gpu_stat.py`（stdlib、讀 nvidia-smi、:3601）——因 app 在 CPU 容器量不到 VRAM（使用者選「host gpu-stat 端點」，D-17）；② `services/resources.py`：RAM(psutil)／儲存(shutil)／VRAM(httpx→gpu_stat)＋`can_reserve` 以 RES_CAP 80% 守門；③ `routes/endpoints.py` 端點 CRUD（API-11，function 白名單、active 旗標）、`routes/resources.py`（API-12）；④ 抽出 `responses.py` 統一外型，main 加 HTTPException／Validation／Exception 三 handler 使所有 API 錯誤同外型；psutil 入 requirements（重建映像）。
+- 遇到困難：gpu_stat 綁 127.0.0.1 時，容器（經 host.docker.internal＝橋接閘道 IP）連不到。
+- 又怎麼改：gpu_stat 預設綁 0.0.0.0:3601（容器可達）；SEC 註記 Stage 2 以防火牆限橋接網段。
+- 最後如何解決：**S-03 驗證通過**——端點 CRUD（建立/清單/停用/刪除）皆正常、非法 function 回 HTTP 400（統一外型）；`/api/resources` 回 RAM 23.1%／儲存 30.3%／VRAM 22633MiB(23.1%)／cap 80%（容器確實經 host gpu_stat 取到 VRAM）；`can_reserve` ok=True。
+- 待續：閒置 unload／GPU reserve 整合待 S-06（vLLM）；503 守門接到 S-04 起工作時；里程碑「建立工作/查清單」curl 屬 S-04。**Sprint 0（S-01/02/03）邏輯完成。**

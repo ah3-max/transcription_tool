@@ -1,31 +1,25 @@
-"""stt-translate 應用進入點（S-01／S-02）。
+"""stt-translate 應用進入點（S-01／S-02／S-03）。
 
 一套 FastAPI 同時提供 UI（同源靜態服務 web/）＋ REST（/api）＋ 之後的 WS（/ws）。
-回應一律採統一外型 {data, error?, message?}。內網綁定與埠由 Docker／環境變數決定。
-啟動時建立 SQLite 四表並啟動到期清除背景任務（S-02）。
+回應一律採統一外型 {data, error?, message?}（見 responses.py）。
+啟動時建立 SQLite 四表並啟動到期清除背景任務（S-02）；掛載端點 CRUD 與資源查詢路由（S-03）。
 """
 import asyncio
 from contextlib import asynccontextmanager
 
-from fastapi import FastAPI, Request
+from fastapi import FastAPI, HTTPException, Request
+from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
 
 from config import settings
+from responses import envelope
 from models_db.db import init_db
 from services.cleanup import sweep_expired
+from routes import endpoints as endpoints_route
+from routes import resources as resources_route
 
 CLEANUP_INTERVAL_SEC = 6 * 3600  # 每 6 小時掃一次到期資料（NFR-3／SEC-7）
-
-
-def envelope(data=None, error: str | None = None, message: str | None = None) -> dict:
-    """統一回應外型：{data, error?, message?}（清單另含 pagination，後續路由再加）。"""
-    body: dict = {"data": data}
-    if error is not None:
-        body["error"] = error
-    if message is not None:
-        body["message"] = message
-    return body
 
 
 async def _cleanup_loop() -> None:
@@ -33,8 +27,7 @@ async def _cleanup_loop() -> None:
         try:
             sweep_expired()
         except Exception:
-            # 清除失敗不應拖垮服務；錯誤不外露細節（SEC-8）
-            pass
+            pass  # 清除失敗不拖垮服務；不外露細節（SEC-8）
         await asyncio.sleep(CLEANUP_INTERVAL_SEC)
 
 
@@ -59,19 +52,37 @@ app = FastAPI(
 
 @app.get("/api/health")
 async def health() -> dict:
-    """健康檢查：回 200。"""
     return envelope({"status": "ok", "app": "stt-translate", "version": app.version})
+
+
+@app.exception_handler(HTTPException)
+async def http_exception_handler(request: Request, exc: HTTPException) -> JSONResponse:
+    return JSONResponse(
+        status_code=exc.status_code,
+        content=envelope(error="http_error", message=str(exc.detail)),
+    )
+
+
+@app.exception_handler(RequestValidationError)
+async def validation_exception_handler(request: Request, exc: RequestValidationError) -> JSONResponse:
+    return JSONResponse(
+        status_code=400,
+        content=envelope(error="bad_request", message="輸入驗證失敗"),
+    )
 
 
 @app.exception_handler(Exception)
 async def unhandled_exception_handler(request: Request, exc: Exception) -> JSONResponse:
-    """未預期錯誤統一外型；SEC-8：不外露堆疊與路徑細節。"""
+    # SEC-8：不外露堆疊與路徑細節
     return JSONResponse(
         status_code=500,
         content=envelope(error="internal", message="伺服器內部錯誤"),
     )
 
 
-# 同源靜態服務 web/（html=True 讓根網址載入 index.html）。
-# 必須掛在所有 /api、/ws 路由「之後」，否則會吃掉這些路徑。
+# REST 路由（須在靜態掛載之前）
+app.include_router(endpoints_route.router)
+app.include_router(resources_route.router)
+
+# 同源靜態服務 web/（html=True 讓根網址載入 index.html）。掛在所有 /api、/ws 之後。
 app.mount("/", StaticFiles(directory=settings.web_dir, html=True), name="web")

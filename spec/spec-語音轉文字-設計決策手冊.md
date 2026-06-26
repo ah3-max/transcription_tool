@@ -307,3 +307,4 @@ endpoints（獨立，被路由設定引用）
 | D-14 | 部署拓樸 | app 進 Docker（純 CPU）；GPU 模型 vLLM/NLLB 與 LM Studio 皆 host 原生、app 經 host.docker.internal 連 | 共用生產主機：不裝 nvidia-container-toolkit、不重啟 Docker daemon → 對同主機 ~17 個生產容器零影響 | 全 Docker（含 GPU 容器，需重設 runtime＋重啟 daemon、波及他人生產）／app 也原生（放棄 Docker 一致性） |
 | D-15 | 執行環境版本 | app 用 Python 3.12（容器）、依賴鎖版；Ollama 不採用 | 預設 python3 為 3.14、ML wheel 尚未跟上；文字 LLM 已有 LM Studio、無需 Ollama | Python 3.14（torch/vLLM 裝不起）／導入 Ollama（多餘元件） |
 | D-16 | vLLM-on-Blackwell PoC 為 S-06 前硬性關卡 | 即時 ASR 上線前先 PoC：PyTorch cu128/130＋新版 vLLM 跑 Qwen3-ASR、驗 sm_120 kernel 與串流 | Blackwell(sm_120) 需新 CUDA/torch，挑錯 build 會 no kernel image available | 直接整合上線（高失敗風險、難除錯） |
+| D-17 | app 量不到 VRAM 的解法 | RAM/儲存/佇列由 app(容器)量＋503 守門；VRAM 由 host `gpu_stat.py`(讀 nvidia-smi、:3601) 經 host.docker.internal 提供；GPU reserve 交 vLLM `gpu_memory_utilization` | CPU 容器無 GPU、pynvml 不可行；不為量 VRAM 而裝 nvidia-container-toolkit／動 daemon(D-14) | 掛 nvidia-smi 進容器(脆弱)／VRAM 不量(FR-24 缺顯示) |

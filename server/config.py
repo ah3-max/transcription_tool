@@ -21,6 +21,7 @@ class Settings(BaseSettings):
     llm_endpoint: str = "http://host.docker.internal:1234/v1"   # LM Studio：gemma-4-31b
     asr_endpoint: str = "http://host.docker.internal:8000/v1"   # vLLM：Qwen3-ASR（待建）
     live_tr_endpoint: str = "http://host.docker.internal:8001"  # NLLB（待建）
+    gpu_stat_endpoint: str = "http://host.docker.internal:3601"  # host gpu_stat（VRAM 查詢，D-17）
 
     # 政策與資源
     retention_days: int = 7
