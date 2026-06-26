@@ -81,12 +81,8 @@ python3 host-helpers/gpu_stat.py       # 預設 :3601
 **問題**：`host-helpers/gpu_stat.py` 綁 `0.0.0.0:3601`、LM Studio 綁 `0.0.0.0:1234`，內網任何機器可直連；規格要求「模型端點綁 localhost、不對內網外露」。
 **要做（分兩塊）**：
 - **gpu_stat（我們可控，優先）**：改成只讓 **docker 橋接網段**可達、LAN 不可達。二擇一：
-  - (建議) 綁 compose 網路的「橋接閘道 IP」而非 `0.0.0.0`：
-    ```bash
-    docker network inspect transcription_tool_default \
-      -f '{{ (index .IPAM.Config 0).Gateway }}'   # 取得如 172.x.0.1
-    ```
-    以 `GPU_STAT_HOST=<該IP>` 啟動 `gpu_stat.py`（容器經 `host.docker.internal` 仍連得到，LAN 連不到）。把此 IP 偵測寫進啟動腳本/systemd。
+  - (建議・已實作) 綁 **docker0 閘道**（host-gateway，本機 `172.17.0.1`）而非 `0.0.0.0`：容器經 `host.docker.internal` 連得到、LAN 連不到。`gpu_stat.py` 已用 `_iface_ipv4("docker0")` 自動偵測，預設即安全（亦可 `GPU_STAT_HOST=<該IP>` 明設）。
+    > ⚠️ **更正（2026-06-26，見 dev_log G2）**：原稿建議「綁 compose 網路閘道（`transcription_tool_default`＝`172.25.0.1`）」**是錯的**——`host.docker.internal` 由 `extra_hosts: host-gateway` 提供，Docker 解析為**預設 bridge(docker0) 閘道 `172.17.0.1`**，不是專案網路閘道；綁 `172.25.0.1` 容器反而連不到。**正確目標＝docker0 閘道**。`172.25.0.1` 與 `172.17.0.1` 皆非 LAN 網卡（LAN＝eth0 192.168.x），綁哪個都不對 LAN 外露，差別只在容器連不連得到。
   - (替代) 維持 `0.0.0.0` 但加防火牆規則（見下）。
 - **LM Studio（共用服務，需使用者點頭）**：二擇一，**動工前先問使用者**：
   - LM Studio 設定關閉「Serve on Local Network」/ 綁 `127.0.0.1`；或

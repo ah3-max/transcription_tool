@@ -19,6 +19,7 @@
 - **困難/取捨**：host 無 pytest（`python`/`pytest` 皆缺），測試須在容器內跑：`docker compose exec -T stt-app sh -c "cd /app && python -m pytest tests -q"`。
 - **驗收**：容器內 pytest **18 → 19 passed**（新增 1 case 全綠）；`src_lang=foo`→400、`zh/zh_en/en`→202。
 - **剩餘/全鏈路待辦**：前端「辨識語言」按鈕日後配線時，務必送 `{zh,zh_en,en}` 代碼（非中文字串），與後端 `VALID_SRC` 同步——此為改欄位的「顯示／傳輸」尚未補的一段，待前端 Story（S-11）配線時一起做。
+  - **2026-06-26 更新（待辦已關閉）**：S-11 前端拆檔(`c85708b`，本分支較早 commit)已完成此配線——`web/index.html:155` 辨識語言按鈕帶 `data-src="zh"/"zh_en"/"en"`、`web/app.js:158` 已 `fd.append('src_lang', src)`，三端（前端代碼→傳輸→後端 `VALID_SRC`）代碼一致（已 grep 驗）。原 G1 時 app.js 尚未存在、S-11 之後補齊，故此處不再是缺口。
 
 ---
 
@@ -62,7 +63,7 @@
   - 即時 app smoke：壞檔(.wav 內容是文字) → `400 {"error":"bad_file"}`，且 `/api/jobs` 無孤兒。
 - **剩餘/全鏈路待辦**：
   - 與 S-04 真前處理（DeepFilterNet3/VAD，`services/preprocess.py` 後續擴充）整合時，解碼/時長應沿用本入口、勿重複解碼。
-  - 前端尚未顯示時長；DB 既有 `duration` 可供 S-11 顯示用。
+  - 前端尚未顯示時長：`web/app.js` 的 `loadJobs`/`loadHistory` 未渲染 `duration`。**更正（2026-06-26）**：S-11(`c85708b`) 已合併、且早於本欄(G4) 加入，故此項不該掛在「S-11」名下——需**另開後續前端工作**補顯示，非等 S-11。DB `duration` 已可取用。
   - （可選）MIME 嗅探未加：ffprobe 解碼成功已強於 MIME，暫不引入 `python-magic`。
 
 ---
