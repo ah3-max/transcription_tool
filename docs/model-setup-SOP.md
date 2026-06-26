@@ -82,26 +82,57 @@ HF 的 `hf download` 會校驗每個 LFS 檔的 SHA256（etag）與 `model.safet
 - 在 LM Studio 設「JIT load / idle TTL」對應 `IDLE_RELEASE_MIN=10`（閒置卸載省 VRAM，D-06）。
 - app 端：`.env` 的 `LLM_ENDPOINT=http://host.docker.internal:1234/v1`，模型名 `google/gemma-4-31b`。
 
-### B. Qwen3-ASR-1.7B — vLLM（:8000）⛔ 有硬關卡
-> **D-16 硬關卡**：本卡是 Blackwell（sm_120），需 PyTorch cu128/130 ＋新版 vLLM，否則會 `no kernel image available`。**權重已可先下載，但能不能串流要先過 PoC。**
-> 📌 **本專案 PoC 由他人負責**；下方 venv／啟動步驟僅供 PoC 負責者參考，本側只備妥權重（已下載）與指令。
+### B. Qwen3-ASR-1.7B — vLLM（:8000）✅ D-16 PoC 已過（2026-06-26，GO）
+> **D-16 PoC 結論：GO**。Blackwell（sm_120）以 vLLM 0.23.0 + torch 2.11.0+**cu130** 完整編譯模式跑得起 Qwen3-ASR-1.7B，批次與串流（SSE＋WebSocket `/v1/realtime`）皆可用、不回時間戳。逐關證據見 `docs/dev_log/vllm-asr-poc.md`。
 
-1. 建 ASR 專用 venv（與 NLLB 分開）：
+**已驗環境（pin）**：vllm `0.23.0`｜torch `2.11.0+cu130`｜triton `3.6.0`｜flashinfer `0.6.12`｜transformers `5.12.1`｜soundfile `0.14.0`(libsndfile 1.2.2)｜py `3.12.13`。
+
+1. host 前置（**必要，PoC 暴露的缺口**）：
+   - `sudo apt install -y build-essential`（vLLM/Triton JIT 編 launcher 必用 `cc`；`--enforce-eager` 也擋不掉模型內建 Triton kernel）。
+   - venv 內補裝 **soundfile**（伺服器解上傳音檔的後端；缺它批次/SSE 端點無法解碼）：
+     ```bash
+     VIRTUAL_ENV=~/.venvs/asr uv pip install soundfile
+     ```
+2. 建 venv＋裝 vLLM（**先 vLLM 帶 torch**，勿手動塞 cu128——vLLM 0.23 原生 cu130、實測 sm_120 OK）：
    ```bash
    uv venv ~/.venvs/asr --python 3.12
-   # 先裝對 Blackwell 的 torch（cu128+），再裝 vLLM＋官方 ASR 包
-   uv pip install --python ~/.venvs/asr/bin/python \
-     --index-url https://download.pytorch.org/whl/cu128 torch
-   uv pip install --python ~/.venvs/asr/bin/python vllm qwen-asr
+   VIRTUAL_ENV=~/.venvs/asr uv pip install vllm soundfile
    ```
-2. PoC 驗證（D-16）：確認 torch 認得 sm_120、vLLM 載得起 Qwen3-ASR、串流可用。
-3. 啟動（`qwen-asr-serve` 是官方對 `vllm serve` 的包裝；`--gpu-memory-utilization` 對應 D-17 的 reserve）：
+3. 固定 env（每次啟動都要）：
    ```bash
-   ~/.venvs/asr/bin/qwen-asr-serve Qwen/Qwen3-ASR-1.7B \
-     --gpu-memory-utilization 0.8 --host 0.0.0.0 --port 8000
+   NV="$HOME/.venvs/asr/lib/python3.12/site-packages/nvidia/cu13"
+   export CUDA_HOME="$NV" CUDA_PATH="$NV"
+   export PATH="$NV/bin:$HOME/.venvs/asr/bin:$PATH"        # nvcc/ninja 進 PATH
+   export VLLM_NO_USAGE_STATS=1 DO_NOT_TRACK=1 HF_HUB_DISABLE_TELEMETRY=1   # 關遙測（NG-1）
+   export VLLM_USE_FLASHINFER_SAMPLER=0                    # ★關鍵：取樣器用 torch 原生，
+                                                           # 繞過 flashinfer sm_120 JIT 的 CUDA 版本守衛
    ```
-4. 約束：串流模式**不回時間戳**（NG-6），時間以伺服器時鐘標記；批次單段 ≤20 分鐘、每 15 分鐘切段。
-5. app 端：`ASR_ENDPOINT=http://host.docker.internal:8000/v1`。
+4. 啟動（完整編譯模式，**不加** `--enforce-eager`；以 `Qwen3ASRRealtimeGeneration` 架構載同一份權重 → 同時掛載批次/SSE 與 `/v1/realtime` WebSocket）：
+   ```bash
+   ~/.venvs/asr/bin/vllm serve Qwen/Qwen3-ASR-1.7B \
+     --revision 7278e1e70fe206f11671096ffdd38061171dd6e5 \
+     --hf-overrides '{"architectures":["Qwen3ASRRealtimeGeneration"]}' \
+     --gpu-memory-utilization 0.15 \
+     --kv-cache-memory-bytes 8589934592 \
+     --host 0.0.0.0 --port 8000
+   ```
+   - `--revision <sha>`：鎖版（SEC-1）。
+   - `--gpu-memory-utilization 0.15`：**非** SOP 舊寫的 0.8——0.8 是「全體服務總上限 RES_CAP」，非單一實例 util；本模型小，0.15(~14GB) 即足、避免搶爆共用卡。
+   - `--kv-cache-memory-bytes 8589934592`(8GiB)：**共用 GPU 必要**——顯式 KV 大小讓 vLLM 跳過 memory-profiling 的 free-memory 守衛，避免他人（LM Studio）在 profiling 視窗釋放/重載 VRAM 觸發 `AssertionError`。65536 max-len 約需 7GiB，給 8GiB 有餘裕。
+   - 首次會 torch.compile/Inductor + CUDA graph capture（~37s，會快取，之後快）；等待用 `curl --retry`，勿前景 `sleep`。
+5. 健康檢查與煙測：
+   ```bash
+   curl -s http://localhost:8000/v1/models                       # 200＝起來
+   curl -s http://localhost:8000/v1/audio/transcriptions \
+     -F file=@中文.wav -F model=Qwen/Qwen3-ASR-1.7B               # 批次
+   # 串流：/v1/audio/transcriptions 帶 -F stream=true（SSE）；或 ws://host:8000/v1/realtime（WebSocket）
+   ```
+6. 約束：串流模式**不回時間戳**（NG-6），時間以伺服器時鐘標記；批次單段 ≤20 分鐘、每 15 分鐘切段。`/v1/realtime` 以 **5s 區塊** 出 partial（首 partial 約 5s），且每段輸出含 `language {lang}<asr_text>` 前綴，app 解析需剝除（批次端點 server 端已自動剝）。
+7. app 端：`ASR_ENDPOINT=http://host.docker.internal:8000/v1`（容器經 `extra_hosts` 連 host，已實測 200）。
+8. ⚠ 共用 GPU 維運：殺 vLLM 要連 **`VLLM::EngineCore` 子行程一起殺**（父行程被 kill 後子行程會殘留佔 VRAM、且 cmdline 不含 `vllm`）：
+   ```bash
+   pkill -9 -f '\.venvs/asr/bin/vllm'; pkill -9 -f 'VLLM::EngineCore'
+   ```
 
 ### C. NLLB-200-3.3B — 自寫小服務（:8001）⚠ 要自己包
 > NLLB 是**純模型、無內建 server，且非 OpenAI 相容**（用 FLORES-200 語言碼、需 `forced_bos_token_id`）。要自寫一支服務掛 :8001。語言碼：中(簡)`zho_Hans`、中(繁)`zho_Hant`、英 `eng_Latn`、泰 `tha_Thai`。
