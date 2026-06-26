@@ -16,6 +16,9 @@ venv/
 *.egg-info/
 .pytest_cache/
 
+# host 端測試用的 vendored 套件（pip --target；75MB、可重建、勿入庫）
+server/.deps/
+
 # 編輯器／作業系統
 .DS_Store
 .idea/
