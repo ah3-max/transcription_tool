@@ -61,6 +61,26 @@ def test_export_record_docx_filename_is_server_id(client, monkeypatch):
     assert f'filename="{oid}.docx"' in r.headers["content-disposition"]  # 檔名用 server id（SEC-3）
 
 
+def test_list_records(client, monkeypatch):
+    """問題 B：列出已生成記錄，供重整後重新匯出。"""
+    _add_post_endpoint(client)
+    monkeypatch.setattr(postprocess, "httpx", _FakeProvider())
+    assert client.get("/api/records").json()["pagination"]["total"] == 0  # 初始為空
+    oids = []
+    for _ in range(2):
+        oids.append(client.post(
+            "/api/records",
+            data={"template": "meeting"},
+            files={"transcript_file": ("t.txt", "內容".encode("utf-8"), "text/plain")},
+        ).json()["data"]["output_id"])
+    body = client.get("/api/records?limit=10").json()
+    assert body["pagination"]["total"] == 2
+    ids = [r["id"] for r in body["data"]]
+    assert set(oids) == set(ids)
+    row = body["data"][0]
+    assert {"id", "ref_type", "ref_id", "fmt", "created_at"} <= set(row)
+
+
 def test_export_record_pdf_rejected(client, monkeypatch):
     _add_post_endpoint(client)
     monkeypatch.setattr(postprocess, "httpx", _FakeProvider())

@@ -173,3 +173,31 @@ def test_valid_audio_has_duration(client):
     assert job["duration"] is not None and job["duration"] >= 0
     d = client.get(f"/api/jobs/{job['job_id']}").json()["data"]
     assert "duration" in d
+
+
+def test_list_job_outputs_aggregate(client):
+    """問題 E：彙整端點一次回所有 transcript 產出（含 job 原檔名），避免前端 N+1。"""
+    jid = _make_job(client)
+    oid = _seed_transcript(jid)
+    body = client.get("/api/jobs/outputs?kind=transcript").json()
+    assert body["pagination"]["total"] >= 1
+    row = next(o for o in body["data"] if o["id"] == oid)
+    assert row["job_id"] == jid and row["kind"] == "transcript"
+    assert row["original_name"]              # 帶回 job 原檔名供下拉顯示
+    # 'outputs' 不可被當成 job_id 路由（宣告順序）
+    assert client.get("/api/jobs/outputs?kind=translation").json()["data"] == []
+
+
+def test_missing_ffprobe_returns_503(client, monkeypatch):
+    """問題 C：環境缺 ffprobe（RuntimeError）→ 明確 503，而非裸 500；不留孤兒。"""
+    from services import preprocess
+
+    def _boom(path):
+        raise RuntimeError("ffprobe 不存在：請確認映像已安裝 ffmpeg")
+
+    monkeypatch.setattr(preprocess, "probe_duration_seconds", _boom)
+    r = client.post("/api/jobs", files={"files": _wav()},
+                    data={"src_lang": "zh", "out_langs": "zh"})
+    assert r.status_code == 503
+    assert r.json()["error"] == "unavailable"
+    assert client.get("/api/jobs").json()["pagination"]["total"] == 0

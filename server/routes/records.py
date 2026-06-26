@@ -125,6 +125,28 @@ async def create_record(
     })
 
 
+@router.get("")
+def list_records(limit: int = 50, offset: int = 0):
+    """列出已生成的記錄（kind='record' 的 outputs），供重整後重新匯出（問題 B）。
+
+    註：範本別（template）目前未存進 outputs 表，故不在此回傳；如需顯示需另補欄位。
+    """
+    limit = max(1, min(limit, 200))
+    offset = max(0, offset)
+    with db() as conn:
+        total = conn.execute(
+            "SELECT count(*) FROM outputs WHERE kind='record'"
+        ).fetchone()[0]
+        rows = conn.execute(
+            "SELECT id,ref_type,ref_id,fmt,created_at FROM outputs "
+            "WHERE kind='record' ORDER BY created_at DESC LIMIT ? OFFSET ?",
+            (limit, offset),
+        )
+        data = [{"id": r["id"], "ref_type": r["ref_type"], "ref_id": r["ref_id"],
+                 "fmt": r["fmt"], "created_at": r["created_at"]} for r in rows]
+    return {"data": data, "pagination": {"total": total, "limit": limit, "offset": offset}}
+
+
 @router.get("/{output_id}/export")
 def export_record(output_id: str, fmt: str = "docx"):
     with db() as conn:

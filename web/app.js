@@ -30,6 +30,28 @@
     }
   };
 
+  // 下載：fetch→檢查 res.ok→blob→觸發下載（問題 F）。失敗用 msgEl 顯示友善訊息、不整頁跳走。
+  async function download(path, filename, msgEl){
+    if(msgEl) msgEl.textContent='';
+    try {
+      var r = await fetch('/api' + path);
+      if(!r.ok){
+        var m = t('dl.fail');
+        try { var j = await r.json(); if(j && j.message) m = j.message; } catch(e){}
+        if(msgEl) msgEl.textContent = m; else alert(m);
+        return;
+      }
+      var blob = await r.blob();
+      var url = URL.createObjectURL(blob);
+      var a = document.createElement('a');
+      a.href = url; a.download = filename || 'download';
+      document.body.appendChild(a); a.click(); a.remove();
+      setTimeout(function(){ URL.revokeObjectURL(url); }, 1000);
+    } catch(e){
+      if(msgEl) msgEl.textContent = t('dl.fail'); else alert(t('dl.fail'));
+    }
+  }
+
   var FN_LABEL = { asr:'fn.asr', batch_tr:'fn.btr', live_tr:'fn.rtr', post:'fn.post' };
 
   // ══════════════════════════ 導覽與面板 ══════════════════════════
@@ -41,7 +63,7 @@
     crumb(); document.querySelector('.main').scrollTop=0;
     if(p==='set'){ loadEndpoints(); }
     if(p==='batch'){ loadJobs(); }
-    if(p==='gen'){ loadTranscriptSources(); }
+    if(p==='gen'){ loadTranscriptSources(); loadRecords(); }
   }
   document.querySelectorAll('#nav button, #mnav button').forEach(function(b){ b.addEventListener('click', function(){ show(b.dataset.p); }); });
 
@@ -188,17 +210,32 @@
       var rows=(await api.json('GET','/jobs?limit=50')).data || [];
       var cnt=$('histCount'); if(cnt) cnt.textContent=rows.length;
       if(!rows.length){ box.innerHTML='<p class="muted">'+esc(t('batch.empty'))+'</p>'; return; }
-      box.innerHTML = rows.map(function(j){
-        var langs=(j.out_langs||[]).map(function(l){
-          return '<button class="ic" data-job="'+esc(j.job_id)+'" data-lang="'+esc(l)+'">'+esc(l)+'.docx</button>';
-        }).join('');
+      // 用彙整端點一次撈 transcript＋translation 產出，依 job 分組（避免逐筆 N+1，問題 A/E）
+      var byJob={};
+      var kinds=['transcript','translation'];
+      for(var ki=0; ki<kinds.length; ki++){
+        var outs=(await api.json('GET','/jobs/outputs?kind='+kinds[ki]+'&limit=500')).data || [];
+        outs.forEach(function(o){ (byJob[o.job_id]||(byJob[o.job_id]=[])).push(o); });
+      }
+      box.innerHTML = '<p class="muted" id="histMsg" style="margin:0 0 8px"></p>' + rows.map(function(j){
+        // 依「實際 outputs」生鈕：來源語言給 transcript、其餘給 translation，URL 用實際 kind（問題 A）
+        var outs=byJob[j.job_id]||[];
+        var acts = outs.length
+          ? outs.map(function(o){
+              return '<button class="ic" data-job="'+esc(j.job_id)+'" data-kind="'+esc(o.kind)+'"'+
+                     ' data-lang="'+esc(o.lang||'')+'" data-fmt="'+esc(o.fmt||'docx')+'">'+
+                     esc(t('kind.'+o.kind))+' '+esc(o.lang||'')+'</button>';
+            }).join('')
+          : '<span class="muted">'+esc(t('hist.noOutput'))+'</span>';
         return '<div class="ses"><div class="nm">'+esc(j.original_name)+'<small>'+esc(j.job_id)+' · '+esc(stLabel(j.status))+'</small></div>'+
-               '<span class="meta">'+esc(stLabel(j.status))+'</span><div class="act">'+langs+'</div></div>';
+               '<span class="meta">'+esc(stLabel(j.status))+'</span><div class="act">'+acts+'</div></div>';
       }).join('');
       box.querySelectorAll('button[data-job]').forEach(function(b){
         b.addEventListener('click', function(){
-          // 匯出 job 逐字稿（API-04）；S-04 產出落檔後即可下載
-          window.location = '/api/jobs/'+encodeURIComponent(b.dataset.job)+'/export?fmt=docx&kind=transcript&lang='+encodeURIComponent(b.dataset.lang);
+          var fmt=b.dataset.fmt||'docx';
+          var path='/jobs/'+encodeURIComponent(b.dataset.job)+'/export?fmt='+encodeURIComponent(fmt)+
+                   '&kind='+encodeURIComponent(b.dataset.kind)+'&lang='+encodeURIComponent(b.dataset.lang);
+          download(path, b.dataset.job+'_'+b.dataset.kind+'_'+b.dataset.lang+'.'+fmt, $('histMsg'));
         });
       });
     } catch(e){ box.innerHTML='<p class="muted">'+esc(e.message)+'</p>'; }
@@ -234,15 +271,11 @@
     var batchGrp=sel.querySelector('optgroup[data-i18ngrp="nav.batch"]');
     if(!batchGrp) return;
     try {
-      var jobs=(await api.json('GET','/jobs?limit=50')).data || [];
-      var opts='';
-      for(var i=0;i<jobs.length;i++){
-        var det=(await api.json('GET','/jobs/'+encodeURIComponent(jobs[i].job_id))).data;
-        (det.outputs||[]).filter(function(o){return o.kind==='transcript';}).forEach(function(o){
-          opts+='<option value="'+esc(o.id)+'">'+esc(jobs[i].original_name)+' — '+esc(o.lang||'')+'</option>';
-        });
-      }
-      batchGrp.innerHTML=opts;
+      // 單次彙整端點取所有 transcript 產出（含 job 原檔名），不再逐 job N+1（問題 E）
+      var outs=(await api.json('GET','/jobs/outputs?kind=transcript&limit=500')).data || [];
+      batchGrp.innerHTML = outs.map(function(o){
+        return '<option value="'+esc(o.id)+'">'+esc(o.original_name)+' — '+esc(o.lang||'')+'</option>';
+      }).join('');
     } catch(e){ /* 靜默：來源為空不擋頁 */ }
   }
 
@@ -272,6 +305,7 @@
       result.textContent=d.content; result.style.display='block';
       genTag.textContent=t('gen.done');
       msg.textContent='';
+      loadRecords();                                      // 重新整理已生成記錄清單（問題 B）
     } catch(e){
       // 409 多為未設定 post 端點
       msg.textContent = /endpoint|post/i.test(e.message) ? t('gen.noEndpoint') : (e.message || t('err.generic'));
@@ -283,8 +317,33 @@
   if(genExportBtn) genExportBtn.addEventListener('click', function(){
     if(!lastRecordId){ $('genMsg').textContent=t('gen.needGen'); return; }
     var fmt=$('genExportFmt').value || 'docx';
-    window.location='/api/records/'+encodeURIComponent(lastRecordId)+'/export?fmt='+encodeURIComponent(fmt);
+    download('/records/'+encodeURIComponent(lastRecordId)+'/export?fmt='+encodeURIComponent(fmt),
+             lastRecordId+'.'+fmt, $('genMsg'));
   });
+
+  // ── 已生成記錄清單（問題 B）：重整後仍可重新匯出 ──
+  async function loadRecords(){
+    var box=$('recordsList'); if(!box) return;
+    try {
+      var rows=(await api.json('GET','/records?limit=50')).data || [];
+      if(!rows.length){ box.innerHTML='<p class="muted">'+esc(t('gen.histEmpty'))+'</p>'; return; }
+      box.innerHTML = '<p class="muted" id="recMsg" style="margin:0 0 8px"></p>' + rows.map(function(r){
+        var when=r.created_at ? new Date(r.created_at*1000).toLocaleString() : '';
+        return '<div class="ses"><div class="nm">'+esc(t('kind.record'))+
+               '<small>'+esc(r.id)+' · '+esc(when)+'</small></div>'+
+               '<span class="meta">'+esc(r.ref_type||'')+'</span>'+
+               '<div class="act"><button class="ic" data-rid="'+esc(r.id)+'" data-fmt="docx">docx</button>'+
+               '<button class="ic" data-rid="'+esc(r.id)+'" data-fmt="md">md</button>'+
+               '<button class="ic" data-rid="'+esc(r.id)+'" data-fmt="txt">txt</button></div></div>';
+      }).join('');
+      box.querySelectorAll('button[data-rid]').forEach(function(b){
+        b.addEventListener('click', function(){
+          download('/records/'+encodeURIComponent(b.dataset.rid)+'/export?fmt='+encodeURIComponent(b.dataset.fmt),
+                   b.dataset.rid+'.'+b.dataset.fmt, $('recMsg'));
+        });
+      });
+    } catch(e){ box.innerHTML='<p class="muted">'+esc(e.message)+'</p>'; }
+  }
 
   // ══════════════════════════ 一般設定：端點 CRUD ══════════════════════════
   var addBtn=$('addEpBtn'), addForm=$('addEpForm'), cancelEp=$('cancelEp');

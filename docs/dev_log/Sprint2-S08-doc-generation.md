@@ -15,5 +15,5 @@
   ④ `main.py` 掛 records router。
 - 遇到困難：(a) `build_path` 要求 file_id 為純英數，但 outputs DB id 慣例帶 `o_` 前綴會被擋。(b) 無真 LLM 可端到端驗。(c) 提示注入怎麼驗。
 - 又怎麼改：(a) 檔名用 `new_id()` 的純英數 token，DB id 另組 `"o_"+token`（比照 jobs 的 `j_` 慣例）。(b) 起一個極簡 mock OpenAI 端點（回固定 chat completion），設一個 `function=post` 端點指向它。(c) pytest monkeypatch `postprocess.httpx`，斷言含「忽略先前所有指令」的逐字稿只進 user 訊息、不混入 system。
-- 最後如何解決：**驗證通過** — pytest 綠（`test_postprocess.py` 6 項：範本 prompt 差異、無 post 端點 `PostprocessError`、逐字稿原樣當資料、自訂 md 解析、SEC-4 隔離）。實機 mock 端點：手動上傳逐字稿＋meeting 範本 → 201、`outputs` 落一筆 `kind=record`、回傳 Markdown 內容與章節清單。
+- 最後如何解決：**驗證通過** — pytest 綠（`test_postprocess.py` 7 項：範本 prompt 差異、無 post 端點 `PostprocessError`、逐字稿原樣當資料、自訂 md 解析、SEC-4 隔離）。實機 mock 端點：手動上傳逐字稿＋meeting 範本 → 201、`outputs` 落一筆 `kind=record`、回傳 Markdown 內容與章節清單。
 - 待續：來源下拉接「真錄音記錄／批次產出」需 S-04/S-07 落檔（目前支援手動上傳＋既有 transcript 產出）；護理交班正式欄位待 OQ-3 定案。匯出見 [`Sprint2-S09-export-history`](Sprint2-S09-export-history.md)、前端串接見 [`Sprint3-S11-frontend`](Sprint3-S11-frontend.md)。

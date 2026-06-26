@@ -137,6 +137,10 @@ async def create_jobs(
         except preprocess.BadAudio:
             _cleanup([s[2] for s in staged])
             return _err(400, "bad_file", "無法解碼或非音檔")
+        except RuntimeError:
+            # 環境缺 ffprobe（理應由容器 Dockerfile 安裝）；明確 503 勝過裸 500（問題 C）。
+            _cleanup([s[2] for s in staged])
+            return _err(503, "unavailable", "伺服器缺少 ffmpeg/ffprobe，暫時無法處理上傳")
         if dur > max_sec:
             _cleanup([s[2] for s in staged])
             return _err(413, "too_long", f"音檔超過時長上限 {settings.max_file_min} 分鐘")
@@ -169,6 +173,31 @@ def list_jobs(limit: int = 50, offset: int = 0):
         rows = [_job_dict(r) for r in conn.execute(
             "SELECT * FROM jobs ORDER BY created_at DESC LIMIT ? OFFSET ?", (limit, offset))]
     return {"data": rows, "pagination": {"total": total, "limit": limit, "offset": offset}}
+
+
+@router.get("/outputs")
+def list_job_outputs(kind: str = "transcript", limit: int = 200, offset: int = 0):
+    """一次撈所有 job 產出（含 job 原檔名），供前端來源下拉避免 N+1（問題 E）。
+
+    宣告於 /{job_id} 之前，否則 GET /api/jobs/outputs 會被路由成 job_id='outputs'。
+    """
+    limit = max(1, min(limit, 500))
+    offset = max(0, offset)
+    with db() as conn:
+        total = conn.execute(
+            "SELECT count(*) FROM outputs WHERE kind=?", (kind,)
+        ).fetchone()[0]
+        rows = conn.execute(
+            "SELECT o.id,o.ref_id,o.kind,o.lang,o.fmt,o.created_at,j.original_name "
+            "FROM outputs o JOIN jobs j ON j.job_id=o.ref_id "
+            "WHERE o.kind=? AND o.ref_type='job' "
+            "ORDER BY o.created_at DESC LIMIT ? OFFSET ?",
+            (kind, limit, offset),
+        )
+        data = [{"id": r["id"], "job_id": r["ref_id"], "original_name": r["original_name"],
+                 "kind": r["kind"], "lang": r["lang"], "fmt": r["fmt"],
+                 "created_at": r["created_at"]} for r in rows]
+    return {"data": data, "pagination": {"total": total, "limit": limit, "offset": offset}}
 
 
 def _outputs_of(conn, job_id: str) -> list:

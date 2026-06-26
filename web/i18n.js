@@ -122,6 +122,14 @@ var I = {
   'gen.noEndpoint':{zh:'尚未設定後處理端點（一般設定→新增 function=post 端點）',en:'No post-processing endpoint (Settings → add a post endpoint)',th:'ยังไม่ได้ตั้งเอนด์พอยต์ post'},
   'gen.done':{zh:'已生成',en:'Generated',th:'สร้างแล้ว'},
   'gen.needGen':{zh:'請先生成文件再匯出',en:'Generate a document before exporting',th:'สร้างเอกสารก่อนส่งออก'},
+  'gen.histTitle':{zh:'已生成的記錄',en:'Generated records',th:'บันทึกที่สร้างแล้ว'},
+  'gen.histHint':{zh:'先前生成的記錄會留在這裡，重整頁面後仍可重新匯出。',en:'Previously generated records stay here and can be re-exported after a page reload.',th:'บันทึกที่สร้างไว้ก่อนหน้าจะอยู่ที่นี่ และส่งออกซ้ำได้แม้รีโหลดหน้า'},
+  'gen.histEmpty':{zh:'尚無生成記錄',en:'No records yet',th:'ยังไม่มีบันทึก'},
+  'hist.noOutput':{zh:'尚無可下載產出',en:'No downloadable output yet',th:'ยังไม่มีผลลัพธ์ให้ดาวน์โหลด'},
+  'kind.transcript':{zh:'逐字稿',en:'Transcript',th:'ข้อความถอด'},
+  'kind.translation':{zh:'翻譯',en:'Translation',th:'คำแปล'},
+  'kind.record':{zh:'記錄',en:'Record',th:'บันทึก'},
+  'dl.fail':{zh:'下載失敗，請稍後再試',en:'Download failed, please retry',th:'ดาวน์โหลดไม่สำเร็จ โปรดลองใหม่'},
   'res.na':{zh:'N/A',en:'N/A',th:'N/A'},
   'err.generic':{zh:'操作失敗，請稍後再試',en:'Action failed, please retry',th:'ดำเนินการไม่สำเร็จ'}
 };
