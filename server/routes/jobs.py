@@ -15,6 +15,7 @@ from config import settings
 from models_db.db import db
 from responses import envelope
 from services import export as export_svc
+from services import preprocess
 from services.resources import can_reserve
 from storage.paths import build_path, ensure_zone, new_id, safe_ext
 
@@ -64,6 +65,7 @@ def _job_dict(r) -> dict:
         "job_id": r["job_id"], "original_name": r["original_name"], "zone": r["zone"],
         "src_lang": r["src_lang"], "out_langs": json.loads(r["out_langs"]),
         "status": r["status"], "created_at": r["created_at"], "expire_at": r["expire_at"],
+        "duration": r["duration"],
     }
 
 
@@ -125,20 +127,36 @@ async def create_jobs(
         _cleanup([s[2] for s in staged])
         raise
 
+    # 4b) 深度驗證（SEC-2／G4）：逐檔 ffprobe 驗可解碼/含音訊串流＋時長上限；
+    #     任一失敗即清掉本請求所有檔、不入庫（沿用不留孤兒模式）。
+    max_sec = settings.max_file_min * 60
+    durations = []
+    for _job_id, _name, path in staged:
+        try:
+            dur = preprocess.probe_duration_seconds(path)
+        except preprocess.BadAudio:
+            _cleanup([s[2] for s in staged])
+            return _err(400, "bad_file", "無法解碼或非音檔")
+        if dur > max_sec:
+            _cleanup([s[2] for s in staged])
+            return _err(413, "too_long", f"音檔超過時長上限 {settings.max_file_min} 分鐘")
+        durations.append(int(round(dur)))
+
     # 5) 全部寫成功 → 單一交易入庫；失敗則清檔（不留孤兒）
     try:
         with db() as conn:
-            for job_id, original_name, path in staged:
+            for (job_id, original_name, path), dur in zip(staged, durations):
                 conn.execute(
                     "INSERT INTO jobs(job_id,original_name,zone,src_lang,out_langs,status,"
-                    "created_at,expire_at,path) VALUES(?,?,?,?,?,?,?,?,?)",
+                    "created_at,expire_at,path,duration) VALUES(?,?,?,?,?,?,?,?,?,?)",
                     (job_id, original_name, "uploads", src_lang, json.dumps(langs),
-                     "queued", now, expire, path))
+                     "queued", now, expire, path, dur))
     except Exception:
         _cleanup([s[2] for s in staged])
         raise
 
-    created = [{"job_id": j, "original_name": n, "status": "queued"} for j, n, _ in staged]
+    created = [{"job_id": j, "original_name": n, "status": "queued", "duration": d}
+               for (j, n, _), d in zip(staged, durations)]
     return envelope({"jobs": created})
 
 

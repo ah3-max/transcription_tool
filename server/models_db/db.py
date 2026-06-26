@@ -19,7 +19,8 @@ CREATE TABLE IF NOT EXISTS jobs (
     status        TEXT NOT NULL,           -- queued/running/done/error
     created_at    INTEGER NOT NULL,
     expire_at     INTEGER NOT NULL,
-    path          TEXT NOT NULL
+    path          TEXT NOT NULL,
+    duration      INTEGER                  -- 音檔時長(秒)；上傳時 ffprobe 取得(G4/SEC-2)
 );
 CREATE INDEX IF NOT EXISTS idx_jobs_status     ON jobs(status);
 CREATE INDEX IF NOT EXISTS idx_jobs_created_at ON jobs(created_at);
@@ -80,7 +81,15 @@ def db():
         conn.close()
 
 
+def _migrate(conn) -> None:
+    """冪等遷移：對既有 DB 補上後加的欄位（CREATE TABLE IF NOT EXISTS 不會改既有表）。"""
+    cols = {r["name"] for r in conn.execute("PRAGMA table_info(jobs)")}
+    if "duration" not in cols:  # G4：jobs 新增時長欄
+        conn.execute("ALTER TABLE jobs ADD COLUMN duration INTEGER")
+
+
 def init_db() -> None:
-    """建表＋索引（冪等）。應於 app 啟動時呼叫。"""
+    """建表＋索引＋遷移（冪等）。應於 app 啟動時呼叫。"""
     with db() as conn:
         conn.executescript(SCHEMA)
+        _migrate(conn)

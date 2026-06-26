@@ -46,4 +46,25 @@
 
 ---
 
-- _（G3–G5 待續：G3 需第二台 LAN 機器；G4 需改 Dockerfile 加 ffmpeg；G5 介面先行、實機整合待 S-06。）_
+## G4　上傳深度驗證：解碼＋音訊串流＋時長上限（S-04 / SEC-2）　【2026-06-26 完成】
+
+- **原狀**：`POST /api/jobs` 只驗副檔名白名單＋累計大小；`config.max_file_min`(120) 定義卻沒人用；偽音檔（.wav 內容是文字）也會入庫。
+- **改動**：
+  - `server/Dockerfile`：apt 裝 `ffmpeg`(含 `ffprobe`)；並把 apt 來源由 http 改 https（見下「困難」）。
+  - `server/services/preprocess.py`（新）：`probe_duration_seconds(path)`——ffprobe(JSON、`subprocess timeout=15s`) 驗可解碼＋含音訊串流，回時長秒數；不合法丟 `BadAudio`。集中為「前處理入口」，未來 DeepFilterNet3/VAD 掛同層、避免重複解碼。
+  - `server/routes/jobs.py`：落檔後、入庫前逐檔 probe；不可解碼/非音檔→`400 bad_file`、`> max_file_min*60`→`413 too_long`，兩者皆 `_cleanup` 清掉本請求所有檔（不留孤兒）。時長寫入新欄並回傳。
+  - `server/models_db/db.py`：jobs 加 `duration INTEGER` 欄＋冪等遷移 `_migrate()`（既有 DB 補欄）。`_job_dict` 同步輸出 `duration`（顯示/解析全鏈路）。
+  - `server/tests/test_jobs.py`：`_wav()` 改產生真正可解碼的 WAV（`wave` 模組 PCM16 mono 靜音）；新增 bad_file→400、too_long(monkeypatch max_file_min=0)→413、合法→202＋duration。
+- **困難→解法**：`docker compose build` 裝 ffmpeg 時多個相依（glib/jxl/openjpeg/theora/jack…）`apt` 經 `http://deb.debian.org` 回 **403 Forbidden**；實測改 **https** 來源即全數取得（Dockerfile 內 `sed` 切換 http→https 後再 apt）。
+- **驗收**：
+  - `docker compose up -d --build` 成功、`ffprobe` 在 `/usr/bin/ffprobe`、health ok。
+  - 容器內 `pytest`：**45 passed**（含 G4 三案；既有 S-04/S-09 全綠）。
+  - 即時 app smoke：壞檔(.wav 內容是文字) → `400 {"error":"bad_file"}`，且 `/api/jobs` 無孤兒。
+- **剩餘/全鏈路待辦**：
+  - 與 S-04 真前處理（DeepFilterNet3/VAD，`services/preprocess.py` 後續擴充）整合時，解碼/時長應沿用本入口、勿重複解碼。
+  - 前端尚未顯示時長；DB 既有 `duration` 可供 S-11 顯示用。
+  - （可選）MIME 嗅探未加：ffprobe 解碼成功已強於 MIME，暫不引入 `python-magic`。
+
+---
+
+- _（G3、G5 待續：G3 需第二台 LAN 機器；G5 介面先行、實機整合待 S-06。）_

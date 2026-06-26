@@ -1,14 +1,29 @@
 """S-04 jobs：建立/清單/單筆/刪除、加固（先驗後寫、10GB 上限）、reserve 守門。
-S-09：API-04 匯出（依種子 transcript 產出）。"""
+S-09：API-04 匯出（依種子 transcript 產出）。
+G4：上傳深度驗證（ffprobe 解碼／時長上限）。"""
+import io
+import struct
 import time
+import wave
 
 from config import settings
 from models_db.db import db
 from storage.paths import build_path, ensure_zone, new_id
 
 
-def _wav(name="a.wav", data=b"RIFFxxxxWAVE"):
-    return (name, data, "audio/wav")
+def _real_wav_bytes(seconds=1.0, rate=8000):
+    """產生真正可被 ffprobe 解碼的 WAV（PCM16 mono 靜音），供 G4 深度驗證測試。"""
+    buf = io.BytesIO()
+    with wave.open(buf, "wb") as w:
+        w.setnchannels(1)
+        w.setsampwidth(2)
+        w.setframerate(rate)
+        w.writeframes(struct.pack("<%dh" % int(rate * seconds), *([0] * int(rate * seconds))))
+    return buf.getvalue()
+
+
+def _wav(name="a.wav", data=None):
+    return (name, data if data is not None else _real_wav_bytes(), "audio/wav")
 
 
 def _seed_transcript(job_id, content="# 逐字稿\n\n## 內文\n那個血壓有點高。\n", lang="zh"):
@@ -128,3 +143,33 @@ def test_get_job_includes_outputs(client):
     oid = _seed_transcript(jid)
     outs = client.get(f"/api/jobs/{jid}").json()["data"]["outputs"]
     assert any(o["id"] == oid and o["kind"] == "transcript" for o in outs)
+
+
+def test_bad_audio_rejected_no_orphan(client):
+    """G4/SEC-2：副檔名合法但內容非音檔（無法解碼）→ 400 bad_file，且不留孤兒。"""
+    r = client.post("/api/jobs", files={"files": _wav("fake.wav", b"this is plain text, not audio")},
+                    data={"src_lang": "zh", "out_langs": "zh"})
+    assert r.status_code == 400
+    assert r.json()["error"] == "bad_file"
+    assert client.get("/api/jobs").json()["pagination"]["total"] == 0
+
+
+def test_too_long_rejected_no_orphan(client, monkeypatch):
+    """G4：超過時長上限 → 413 too_long，且不留孤兒。"""
+    monkeypatch.setattr(settings, "max_file_min", 0)   # 上限 0 分 → 任何正時長皆超時
+    r = client.post("/api/jobs", files={"files": _wav()},
+                    data={"src_lang": "zh", "out_langs": "zh"})
+    assert r.status_code == 413
+    assert r.json()["error"] == "too_long"
+    assert client.get("/api/jobs").json()["pagination"]["total"] == 0
+
+
+def test_valid_audio_has_duration(client):
+    """G4：合法音檔 → 202，回傳並落庫時長(秒>0)，get_job 也能取得。"""
+    r = client.post("/api/jobs", files={"files": _wav()},
+                    data={"src_lang": "zh", "out_langs": "zh"})
+    assert r.status_code == 202
+    job = r.json()["data"]["jobs"][0]
+    assert job["duration"] is not None and job["duration"] >= 0
+    d = client.get(f"/api/jobs/{job['job_id']}").json()["data"]
+    assert "duration" in d
