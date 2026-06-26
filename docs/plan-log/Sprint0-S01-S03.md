@@ -49,14 +49,14 @@
 - [x] `../` 等路徑被擋 ✅（realpath＋commonpath；3 惡意輸入全擋）
 - [x] 到期工作連檔帶記錄被清除 ✅（`sweep_expired` 刪檔＋刪列）
 
-**S-03**
-- [x] 可新增/停用端點、切換某功能目標端點 ✅（CRUD＋active 旗標；驗 build/list/patch/delete）
-- [x] 啟動工作只取定額、不超 80% 上限 ✅（`can_reserve` 對 RAM/儲存以 RES_CAP 守門；接 S-04 起工作）
+**S-03**（reserve／路由解析／503 已於 Sprint1-S04-jobs 接線完成並驗證）
+- [x] 可新增/停用端點、切換某功能目標端點 ✅（CRUD＋active；`resolve_endpoint('asr')` 驗證可取 active 端點）
+- [x] 啟動工作只取定額、不超 80% 上限 ✅（`POST /api/jobs` 呼叫 `can_reserve`；RES_CAP=0 模擬→503）
 - [~] 閒置逾時自動釋放、下次重載 — GPU 部分交 vLLM/host（D-17），整合待 S-06
-- [x] 取不到資源回 503 並標記需降級 ✅（`can_reserve`→False 時回 503；實際 wiring 於 S-04）
+- [x] 取不到資源回 503 並標記需降級 ✅（`POST /api/jobs` 回 503 `error:"resource"`＋`degrade:true`，已驗）
 
 **里程碑**
-- [ ] 三條 curl（建立工作 / 查清單 / 設定端點）皆通
+- [x] 三條 curl（建立工作 / 查清單 / 設定端點）皆通 ✅（2026-06-26；jobs API-01/03 見 Sprint1-S04-jobs）
 
 ### 6. 決策與待確認（2026-06-26 本 session 更新／定案）
 - **執行環境改為 app 進 Docker（`python:3.12-slim` 容器），不建 `server/.venv`。** 因：① 預設 `python3`=3.14、torch/vLLM 等 ML wheel 尚未跟上 → app 用 3.12；② 本機為共用生產主機、已跑 ~17 個別人的生產容器且 `nvidia-container-toolkit` 未裝 → app 純 CPU 容器、不碰 Docker daemon、對生產服務零風險。（對應新增決策 D-14／D-15）

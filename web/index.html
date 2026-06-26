@@ -203,9 +203,17 @@
   .exp-lbl{font-size:12px;color:var(--ink-faint);font-weight:600}
 
   .mnav{display:none}
-  @media (max-width:860px){
+  /* ── 平板及以下（≤1024px）：左側欄改底部分頁列、改單欄版面（觸控優先；含 iPad 直向） ── */
+  @media (max-width:1024px){
     .app{grid-template-columns:1fr;grid-template-rows:54px 1fr;grid-template-areas:"top" "main"}
-    .side{display:none}.main{padding:18px 16px 84px}.top{padding:0 16px}
+    .side{display:none}.main{padding:22px 26px 92px}.top{padding:0 18px}
+    .mnav{display:flex;position:fixed;bottom:0;left:0;right:0;z-index:40;background:#10211F;border-top:1px solid rgba(255,255,255,.08);padding:6px 4px 8px;justify-content:space-around}
+    .mnav button{background:none;border:0;color:#7FB3AD;display:flex;flex-direction:column;align-items:center;gap:3px;font-size:10px;padding:4px 6px;flex:1}
+    .mnav button.on{color:#EAF1EE}.mnav .ico{width:20px;height:20px}
+  }
+  /* ── 手機（≤600px）：隱藏次要資訊、再縮間距；平板段（601–1024）保留資源量／原文欄／表格端點欄／波形／場次 meta ── */
+  @media (max-width:600px){
+    .main{padding:18px 16px 84px}.top{padding:0 16px}
     .res,.lang-wrap,.res-toggle{display:none}
     .qrow{grid-template-columns:1fr 70px 28px;gap:10px}.qrow .barwrap{display:none}
     .route th:nth-child(3),.route td:nth-child(3){display:none}
@@ -213,9 +221,6 @@
     .stage-main{padding:50px 18px 24px;gap:16px;--cap:21px}.wave{display:none}.setup{padding:20px 16px}
     .ses{grid-template-columns:1fr auto;gap:8px}.ses .meta{display:none}
     .docpage{padding:26px 22px}
-    .mnav{display:flex;position:fixed;bottom:0;left:0;right:0;z-index:40;background:#10211F;border-top:1px solid rgba(255,255,255,.08);padding:6px 4px 8px;justify-content:space-around}
-    .mnav button{background:none;border:0;color:#7FB3AD;display:flex;flex-direction:column;align-items:center;gap:3px;font-size:10px;padding:4px 6px;flex:1}
-    .mnav button.on{color:#EAF1EE}.mnav .ico{width:20px;height:20px}
   }
   @media (max-width:460px){.ph{font-size:19px}}
 
@@ -255,7 +260,7 @@
   .top-divider{width:1px;height:26px;background:var(--line)}
   .icon-btn{background:var(--surface-2);border:1px solid var(--line);border-radius:12px;width:42px;height:42px;display:flex;align-items:center;justify-content:center;color:var(--ink-soft)}
   .icon-btn:hover{background:var(--surface-3);color:var(--ink)}
-  @media (max-width:860px){.top-divider{display:none}.top-ctrls{gap:6px}#resToggle{display:none}}
+  @media (max-width:600px){.top-divider{display:none}.top-ctrls{gap:6px}#resToggle{display:none}}
 
   /* ===== 深色主題（淺／深可切換） ===== */
   body.dark{
