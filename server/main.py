@@ -21,6 +21,7 @@ from routes import endpoints as endpoints_route
 from routes import resources as resources_route
 from routes import jobs as jobs_route
 from routes import records as records_route
+from ws import live as live_ws
 
 CLEANUP_INTERVAL_SEC = 6 * 3600  # 每 6 小時掃一次到期資料（NFR-3／SEC-7）
 IDLE_CHECK_INTERVAL_SEC = 60     # 每分鐘檢查模型閒置、超 idle_release_min 釋放（G5／D-06）
@@ -102,6 +103,7 @@ app.include_router(endpoints_route.router)
 app.include_router(resources_route.router)
 app.include_router(jobs_route.router)
 app.include_router(records_route.router)
+app.include_router(live_ws.router)  # /ws/live 即時串流（S-06）
 
 # 同源靜態服務 web/（html=True 讓根網址載入 index.html）。掛在所有 /api、/ws 之後。
 app.mount("/", StaticFiles(directory=settings.web_dir, html=True), name="web")

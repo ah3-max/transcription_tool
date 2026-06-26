@@ -151,20 +151,115 @@
   var liveToBatch=$('liveToBatch');
   if(liveToBatch) liveToBatch.addEventListener('click', function(){ show('batch'); });
 
-  // ══════════════════════════ 即時舞台（stub，S-06） ══════════════════════════
+  // ══════════════════════════ 即時舞台（S-06：接 /ws/live） ══════════════════════════
   var setup=$('live-setup'), stageWrap=$('live-stage-wrap');
   var timerEl=$('recTimer'), tHandle=null, tSecs=0;
   function pad(n){return (n<10?'0':'')+n;} function fmtT(s){return pad(Math.floor(s/3600))+':'+pad(Math.floor(s%3600/60))+':'+pad(s%60);}
-  var startBtn=$('startStream');
-  if(startBtn) startBtn.addEventListener('click', function(){ if(!liveReady){ showToast(t('degrade.title'),'err'); return; } setup.style.display='none'; stageWrap.style.display='block'; tSecs=0; timerEl.textContent=fmtT(0); tHandle=setInterval(function(){tSecs++;timerEl.textContent=fmtT(tSecs);},1000); });
-  var stopBtn=$('stopStream');
-  if(stopBtn) stopBtn.addEventListener('click', function(){ if(tHandle){clearInterval(tHandle);tHandle=null;} stageWrap.style.display='none'; setup.style.display='block'; });
   var srcToggle=$('srcToggle'), stageEl=$('stage');
   if(srcToggle) srcToggle.addEventListener('click', function(){ var on=stageEl.classList.toggle('with-src'); srcToggle.textContent=(on?t('live.srcWord')+' ◂':t('live.srcWord')+' ▸'); });
   var stageMain=$('stageMain'), cap=26;
   document.querySelectorAll('.stage-font').forEach(function(b){ b.addEventListener('click', function(){ cap=b.getAttribute('data-d')==='up'?Math.min(cap+2,40):Math.max(cap-2,16); stageMain.style.setProperty('--cap',cap+'px'); }); });
+  var stageSide=document.querySelector('#stage .stage-side');
   var outLang=$('outLang');
-  if(outLang) outLang.addEventListener('change', function(){ var k=outLang.value; document.querySelectorAll('#stageMain .s-primary').forEach(function(p){ var v=p.getAttribute('data-'+k); if(v) p.textContent=v; }); });
+
+  // 設定頁的輸出語言複選（.chk）：點擊切換 on；讀 data-i18n 後綴判語言（lang.th→th）
+  function setupTargets(){
+    var langs=[]; document.querySelectorAll('#live-setup .chk').forEach(function(c){
+      if(!c.classList.contains('on')) return;
+      var sp=c.querySelector('[data-i18n^="lang."]'); if(!sp) return;
+      langs.push(sp.getAttribute('data-i18n').split('.')[1]);
+    }); return langs;
+  }
+  document.querySelectorAll('#live-setup .chk').forEach(function(c){
+    c.style.cursor='pointer'; c.addEventListener('click', function(){ c.classList.toggle('on'); });
+  });
+
+  // ── 即時串流狀態 ──
+  var ws=null, audioCtx=null, micStream=null, procNode=null;
+  var liveTargets=[], finals=[];          // finals: [{src, translations}]
+  var draftEl=null;                       // 目前 interim（半透明草稿）caption
+  function clearStage(){ stageMain.querySelectorAll('.scap').forEach(function(e){ if(e!==draftEl)e.remove(); }); if(stageSide) stageSide.querySelectorAll('.sline').forEach(function(e){e.remove();}); }
+  function shownLang(){ return (outLang&&outLang.value)||'th'; }
+  function renderPrimary(p, translations){ var k=shownLang(); p.textContent=(translations&&translations[k])||t('live.translating')||'…'; }
+  function addFinal(src, translations){
+    if(draftEl){ draftEl.remove(); draftEl=null; }
+    var cap=document.createElement('div'); cap.className='scap';
+    var pp=document.createElement('p'); pp.className='s-primary'; renderPrimary(pp, translations);
+    var ps=document.createElement('p'); ps.className='s-src'; ps.textContent=src;
+    cap.appendChild(pp); cap.appendChild(ps); stageMain.insertBefore(cap, $('stageMain').querySelector('.jump'));
+    if(stageSide){ var l=document.createElement('p'); l.className='sline'; l.innerHTML='<span class="ts">'+fmtT(tSecs)+'</span>'; l.appendChild(document.createTextNode(src)); stageSide.appendChild(l); }
+    finals.push({src:src, translations:translations});
+  }
+  function setDraft(src){
+    if(!draftEl){ draftEl=document.createElement('div'); draftEl.className='scap draft';
+      var pp=document.createElement('p'); pp.className='s-primary'; pp.textContent=t('live.translating')||'…';
+      var ps=document.createElement('p'); ps.className='s-src'; draftEl.appendChild(pp); draftEl.appendChild(ps);
+      stageMain.insertBefore(draftEl, $('stageMain').querySelector('.jump')); }
+    draftEl.querySelector('.s-src').textContent=src;
+  }
+  if(outLang) outLang.addEventListener('change', function(){ // 切換顯示語言：重繪所有 final 的主行
+    var caps=stageMain.querySelectorAll('.scap:not(.draft) .s-primary'); var i=0;
+    finals.forEach(function(f){ if(caps[i]) renderPrimary(caps[i], f.translations); i++; });
+  });
+
+  // 16kHz 單聲道 PCM16 降取樣（PoC 餵法）
+  function downsampleTo16k(f32, inRate){
+    var ratio=inRate/16000; var outLen=Math.floor(f32.length/ratio); var out=new Int16Array(outLen);
+    for(var i=0;i<outLen;i++){ var s=f32[Math.floor(i*ratio)]; s=Math.max(-1,Math.min(1,s)); out[i]=s<0?s*0x8000:s*0x7fff; }
+    return out;
+  }
+  function stopAudio(){
+    if(procNode){ try{procNode.disconnect();}catch(e){} procNode=null; }
+    if(audioCtx){ try{audioCtx.close();}catch(e){} audioCtx=null; }
+    if(micStream){ micStream.getTracks().forEach(function(tr){tr.stop();}); micStream=null; }
+  }
+  function endStream(toSetup){
+    if(tHandle){clearInterval(tHandle);tHandle=null;}
+    stopAudio();
+    if(ws && ws.readyState===1){ try{ws.send(JSON.stringify({type:'stop'}));}catch(e){} }
+    if(toSetup){ stageWrap.style.display='none'; setup.style.display='block'; }
+  }
+
+  var startBtn=$('startStream');
+  if(startBtn) startBtn.addEventListener('click', async function(){
+    if(!liveReady){ showToast(t('degrade.title'),'err'); return; }
+    liveTargets=setupTargets(); if(!liveTargets.length){ showToast(t('live.needTarget')||'請至少選一個輸出語言','err'); return; }
+    finals=[]; draftEl=null;
+    try{ micStream=await navigator.mediaDevices.getUserMedia({audio:{channelCount:1,echoCancellation:true,noiseSuppression:true}}); }
+    catch(e){ showToast(t('live.micDenied')||'無法取得麥克風','err'); return; }
+    setup.style.display='none'; stageWrap.style.display='block'; clearStage();
+    tSecs=0; timerEl.textContent=fmtT(0); tHandle=setInterval(function(){tSecs++;timerEl.textContent=fmtT(tSecs);},1000);
+
+    var proto=location.protocol==='https:'?'wss':'ws';
+    ws=new WebSocket(proto+'://'+location.host+'/ws/live');
+    ws.binaryType='arraybuffer';
+    ws.onopen=function(){ ws.send(JSON.stringify({type:'start', src_lang:'zh', targets:liveTargets, name:null})); };
+    ws.onmessage=function(ev){
+      var m; try{ m=JSON.parse(ev.data); }catch(e){ return; }
+      if(m.type==='ready'){ startCapture(); }
+      else if(m.type==='partial'){ if(m.src) setDraft(m.src); }
+      else if(m.type==='final'){ addFinal(m.src, m.translations||{}); }
+      else if(m.type==='saved'){ showToast(t('live.saved')||'已儲存到錄音記錄','ok'); endStream(true); }
+      else if(m.type==='degraded'){ setLiveDegraded(m.reasons||[]); showToast(t('degrade.title'),'err'); endStream(true); }
+      else if(m.type==='error'){ showToast(m.message||'錯誤','err'); }
+    };
+    ws.onclose=function(){ if(tHandle){clearInterval(tHandle);tHandle=null;} stopAudio(); };
+    ws.onerror=function(){ showToast(t('live.wsErr')||'即時連線錯誤','err'); };
+
+    function startCapture(){
+      audioCtx=new (window.AudioContext||window.webkitAudioContext)();
+      var srcNode=audioCtx.createMediaStreamSource(micStream);
+      procNode=audioCtx.createScriptProcessor(4096,1,1);
+      srcNode.connect(procNode); procNode.connect(audioCtx.destination);
+      procNode.onaudioprocess=function(e){
+        if(!ws||ws.readyState!==1) return;
+        var pcm=downsampleTo16k(e.inputBuffer.getChannelData(0), audioCtx.sampleRate);
+        ws.send(pcm.buffer);
+      };
+    }
+  });
+  var stopBtn=$('stopStream');
+  if(stopBtn) stopBtn.addEventListener('click', function(){ endStream(false); /* 等 server 回 saved 再切回 */ });
 
   // ── 錄音記錄頁 tabs + 摘要載入（stub，S-07） ──
   var recTabs=$('recTabs'), recT=$('recTranscript'), recS=$('recSummary');

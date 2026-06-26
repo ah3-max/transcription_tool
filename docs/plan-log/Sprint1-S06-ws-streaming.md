@@ -45,11 +45,12 @@
 - ⚠ **PoC 交叉發現（NLLB 建置必看）**：SOP §3.C 的 NLLB venv 寫 `--index-url .../whl/cu128 torch`，但 PoC G2 在 **sm_120 實測驗過的是 cu130**。NLLB 走 transformers（torch 非 vLLM 強制 pin），建 venv 後**務必比照 PoC 先驗 sm_120 kernel**（`is_available()`＋`get_arch_list()` 含 `sm_120`＋實跑 matmul），別假設 cu128 在 Blackwell 可用。
 
 ## 3. 收標準（對齊規格 S-06）
-- [ ] 說中文後幾句內出現對應譯文
-- [ ] interim 半透明、final 實心
-- [ ] 停止後「錄音記錄」出現該場、含音檔與逐字稿（寫入 sessions/outputs）
-- [ ] WS 僅接受內網來源、拒絕外部
-- [ ] 串流以伺服器時鐘標記時間（不依賴 ASR 時間戳）
+> 進度（2026-06-27）：app 端程式碼＋單元測試（18 項）全綠；標 ⏳ 者為 realtime ASR 端到端，受共用卡 VRAM 競爭暫擋（待 host 起 `stt-vllm-asr`＋NLLB 實機驗）。
+- [⏳] 說中文後幾句內出現對應譯文 — 程式路徑完成（asr→vad→live_translate→下行），待實機端到端
+- [⏳] interim 半透明、final 實心 — 前端已接 `/ws/live`，待實機視覺驗
+- [~] 停止後「錄音記錄」出現該場、含音檔與逐字稿（寫入 sessions/outputs）— **契約落地＋pytest 已過**；整合驗收（記錄頁顯示）待 S-07＋實機
+- [x] WS 僅接受內網來源、拒絕外部 — `client_allowed` 私網/loopback，pytest 已過
+- [x] 串流以伺服器時鐘標記時間（不依賴 ASR 時間戳）— 下行 `t=time.time()`，NG-6
 
 ## 4. 並行/衝突
 - **碰的檔**：新檔 `ws/live.py`、`services/asr.py`、`services/live_translate.py`；改 `main.py`（註冊 WS，1 行）；`web/app.js`「即時翻譯」頁區塊。
