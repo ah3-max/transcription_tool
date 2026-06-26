@@ -67,4 +67,28 @@
 
 ---
 
-- _（G3、G5 待續：G3 需第二台 LAN 機器；G5 介面先行、實機整合待 S-06。）_
+## G5　閒置逾時釋放顯卡（NFR-1 / D-06）　【介面先行完成；實機整合待 S-06】
+
+- **原狀**：僅 `config.idle_release_min`(10) 存在，`resources.py` 註記「閒置 unload 屬 host、待 S-06」，零實作。
+- **背景**：app 在 CPU 容器內無法直接卸載 GPU；釋放 VRAM＝停掉 host 上的模型服務、下次用前再起。需 host 端可被 app 呼叫的「模型控制」能力。
+- **改動（現在可做且可驗）**：
+  - `server/services/idle.py`（新）：`IdleTracker`（clock 可注入）——`record_use(function)`／`idle_minutes(function)`／`is_loaded`／`mark_released`／`due_for_release`／`check_and_release(hook, threshold)`。`FUNCTION_UNIT` 只把 GPU 模型(asr→vLLM、live_tr→NLLB)對應 unit（batch_tr/post 走共用 LM Studio、不停服務）。預設 hook `release_via_model_ctl` 經 host model_ctl 停 unit（best-effort）。
+  - `host-helpers/model_ctl.py`（新）：host 模型控制服務（仿 gpu_stat、純 stdlib）。`GET /status`、`POST /start|/stop`；**白名單 `ALLOWED_UNITS` 只允許本專案 vLLM/NLLB unit、其餘 403**；同 G2 安全綁 docker0 閘道。`systemctl --user` 子程序逾時保護。
+  - `server/main.py`：lifespan 加 `_idle_release_loop()`（每 60s）呼叫 `tracker.check_and_release(...)`；tracker 在各 Story 呼叫 `record_use` 前為空＝no-op，不影響啟動。
+  - `server/config.py`：加 `model_ctl_endpoint`(預設 host.docker.internal:3602，保留範圍)。
+  - `server/tests/test_idle.py`（新）：注入時鐘＋假 hook，驗 idle_minutes 遞增、超閾觸發釋放、hook 失敗保留 loaded 下輪再試、釋放後 record_use 重載。
+- **驗收**：
+  - 容器 `pytest`：**49 passed**（+4 idle 案；其餘全綠）；health ok（idle loop 不影響啟動）。
+  - `model_ctl.py` 冒煙（短啟即停）：只綁 `172.17.0.1:3602`(非 LAN)；`status?unit=stt-nllb`→`inactive`；非白名單→**403**；容器經 host.docker.internal→**200**；LAN(192.168.1.216)→**000(已擋)**。
+- **剩餘/卡點（待 S-06 實機）**：
+  - **wiring**：S-04/05/06 真正呼叫模型時要呼叫 `idle.tracker.record_use(function)`（本任務只建函式與背景迴圈，尚未在 ASR/翻譯路徑插點）。
+  - **實機驗證**：待 vLLM/NLLB 真的在 host 跑，驗「閒置 10 分→VRAM 釋放、下次使用→自動重載」端到端。`asr` 的 vLLM unit 待 PoC 建立後加入 `ALLOWED_UNITS`／`FUNCTION_UNIT`。
+  - **host 部署**：`model_ctl.py` 上線（systemctl --user 常駐）與真正 start/stop 屬 host 動作，須先取得使用者同意。
+  - 另注意：既有 `stt-nllb.service` 範本綁 `0.0.0.0:8001`（LAN 外露），屬 G2 防火牆議題、待 G2 LM Studio/防火牆一併處理。
+
+---
+
+## 待續（需你協助或後續 Story）
+- **G2 後半**：LM Studio(:1234) 對 LAN 外露——關閉 Serve on Local Network／綁 127.0.0.1，或 host 防火牆擋（連同未來 8000/8001）。動 host 前需你同意。
+- **G3**：3610 跨機可達——本機 `APP_PORT=3610` 可自驗；跨機需第二台 LAN 機器與放行 inbound 3610。
+- **G5 整合**：record_use 插點 + 實機 unload/reload，待 S-06 vLLM 在 host 跑。

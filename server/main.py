@@ -16,12 +16,14 @@ from config import settings
 from responses import envelope
 from models_db.db import init_db
 from services.cleanup import sweep_expired
+from services.idle import release_via_model_ctl, tracker as idle_tracker
 from routes import endpoints as endpoints_route
 from routes import resources as resources_route
 from routes import jobs as jobs_route
 from routes import records as records_route
 
 CLEANUP_INTERVAL_SEC = 6 * 3600  # 每 6 小時掃一次到期資料（NFR-3／SEC-7）
+IDLE_CHECK_INTERVAL_SEC = 60     # 每分鐘檢查模型閒置、超 idle_release_min 釋放（G5／D-06）
 
 
 async def _cleanup_loop() -> None:
@@ -33,14 +35,27 @@ async def _cleanup_loop() -> None:
         await asyncio.sleep(CLEANUP_INTERVAL_SEC)
 
 
+async def _idle_release_loop() -> None:
+    """閒置逾時釋放 GPU（G5）：tracker 在各 Story 呼叫 record_use 前為空、此迴圈即 no-op。
+    釋放經 host model_ctl（best-effort）；host 未跑時失敗、下輪再試，不拖垮服務。"""
+    while True:
+        await asyncio.sleep(IDLE_CHECK_INTERVAL_SEC)
+        try:
+            idle_tracker.check_and_release(release_via_model_ctl, settings.idle_release_min)
+        except Exception:
+            pass
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     init_db()  # 建表＋索引（冪等）
-    task = asyncio.create_task(_cleanup_loop())
+    tasks = [asyncio.create_task(_cleanup_loop()),
+             asyncio.create_task(_idle_release_loop())]
     try:
         yield
     finally:
-        task.cancel()
+        for t in tasks:
+            t.cancel()
 
 
 app = FastAPI(

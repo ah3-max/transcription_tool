@@ -22,6 +22,7 @@ class Settings(BaseSettings):
     asr_endpoint: str = "http://host.docker.internal:8000/v1"   # vLLM：Qwen3-ASR（待建）
     live_tr_endpoint: str = "http://host.docker.internal:8001"  # NLLB（待建）
     gpu_stat_endpoint: str = "http://host.docker.internal:3601"  # host gpu_stat（VRAM 查詢，D-17）
+    model_ctl_endpoint: str = "http://host.docker.internal:3602"  # host model_ctl（閒置 start/stop，G5；3602 在保留範圍）
 
     # 政策與資源
     retention_days: int = 7
