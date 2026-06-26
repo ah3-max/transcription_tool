@@ -14,6 +14,7 @@ services:
     volumes:
       - ./data:/data          # 執行期資料（落在 host 的 2TB / 上）
       - ./web:/web            # 開發即時更新前端
+      - ./server:/app         # 開發：改 server 程式後 docker compose restart 即生效、免 rebuild
     extra_hosts:
       # 讓容器以 host.docker.internal 連到 host 原生的 vLLM / NLLB / LM Studio
       - "host.docker.internal:host-gateway"
