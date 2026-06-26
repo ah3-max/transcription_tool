@@ -26,11 +26,12 @@
 | 磁碟 | 剩 1.3T | 充裕 |
 
 **決議：torch 先走 cu128（成熟、vLLM 相容性驗證最多）；cu130 當失敗分支。**
+> 後續實況：vLLM 0.23 原生 pin 的就是 cu130，G2 實測 sm_120 OK → **最終採 cu130**（未動 cu128 分支），見 dev_log ③④。
 
 ## 4. 閘門式執行清單（逐關：動作→Gate→證據→失敗分支）
-- [ ] **G0 前置完整性**：Qwen3-ASR 權重無 `*.incomplete`；取 `revision/main` sha 鎖版（SEC-1），啟動帶 `--revision <sha>`。
-- [ ] **G1 環境建置**：`uv venv ~/.venvs/asr --python 3.12`；裝 vLLM（cu128 torch）。Gate：install 無錯、`vllm --version` 可印。證據：vllm／torch／cuda 三版本字串（pin）。失敗：torch 非 cu128 → 顯式 cu128 index 重裝再修 vllm。
-- [ ] **G2 ★核心：sm_120 kernel**：`torch.cuda.get_arch_list()` 含 `sm_120`、`is_available()` True、cuda 矩陣乘算出數字（不報 no-kernel）。失敗：換 cu130 torch；仍不行→升/換 vLLM 版本。
+- [x] **G0 前置完整性** ✅：Qwen3-ASR 權重無 `*.incomplete`；取 `revision/main` sha 鎖版（SEC-1），啟動帶 `--revision <sha>`。證據：sha `7278e1e70fe206f11671096ffdd38061171dd6e5`、snapshot 同名、無 incomplete、blobs 4.4G。
+- [x] **G1 環境建置** ✅：`uv venv ~/.venvs/asr --python 3.12`；裝 vLLM（自帶 torch）。Gate：install 無錯、`vllm --version` 可印。→ 實裝 **vllm 0.23.0／torch 2.11.0+cu130／cuda 13.0**（vLLM 0.23 原生即 cu130，未走「cu128 重裝」失敗分支）。
+- [x] **G2 ★核心：sm_120 kernel** ✅：`torch.cuda.get_arch_list()` 含 `sm_120`、`is_available()` True、cuda 矩陣乘算出數字（不報 no-kernel）。→ arch_list 含 sm_120、cap (12,0)、matmul/softmax 實跑無 no-kernel；**cu 版本定為 cu130**（未動失敗分支）。
 - [x] **G3 vLLM 載 Qwen3-ASR** ✅：原生 `vllm serve`＋`--revision <sha> --gpu-memory-utilization 0.15`；完整編譯（torch.compile＋CUDA graph）；`/v1/models` 200。關鍵：`VLLM_USE_FLASHINFER_SAMPLER=0`（繞 flashinfer sm_120 JIT 版本守衛）＋`--kv-cache-memory-bytes 8GiB`（繞共用 GPU profiling race）。
 - [x] **G4 批次轉錄** ✅：POST 8.59s 中文 wav → 內容一致的中文逐字稿。需補裝 soundfile（伺服器解碼後端）。
 - [x] **G5 ★S-06 命脈：串流** ✅：SSE(`stream=true`) TTFT 15ms；真 WebSocket `/v1/realtime`（`--hf-overrides` 載 realtime 架構）5s 段 partial、首 partial 5.24s；**兩路皆不回時間戳**（NG-6）。
@@ -38,7 +39,7 @@
 - [x] **G7 app→vLLM 整合冒煙** ✅：於 app image 內 `resolve_endpoint('asr')` 取得＋容器經 `host.docker.internal:8000/v1/models` 得 200。
 
 ## 5. 🚦 Go / No-Go（S-06 解鎖閘）→ **結論：GO（2026-06-26）**
-- ✅ **GO**：G2–G7 全綠，版本/env/啟動指令已 pin 回 SOP §3.B。S-06 解鎖（即時走 `/v1/realtime`、批次走 `/v1/audio/transcriptions`）。逐關證據見 `docs/dev_log/vllm-asr-poc.md` ⑨–⑭。
+- ✅ **GO**：G0–G7 全過（逐關 ✅，含 ★核心 G2 sm_120），版本/env/啟動指令已 pin 回 SOP §3.B。S-06 解鎖（即時走 `/v1/realtime`、批次走 `/v1/audio/transcriptions`）。逐關證據見 `docs/dev_log/vllm-asr-poc.md` ⑨–⑭。
 - ~~NO-GO（串流不行、批次行）~~：未發生，真 WebSocket 串流可用。
 - ~~NO-GO（kernel 起不來）~~：未發生，cu130 在 sm_120 產出可用 kernel（G2）。
 

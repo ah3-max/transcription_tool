@@ -16,7 +16,7 @@
 | G5 ★串流 partial/final | ✅ 通過 | SSE(`stream=true`)：增量 delta、TTFT 15ms；WebSocket `/v1/realtime`：5s 區塊出 partial（首 partial 5.24s）、38 deltas、final 齊；**兩路皆不回時間戳**(NG-6) |
 | G6 資源 reserve | ✅ 通過 | EngineCore 佔 ~15.9GiB（被 util 0.15＋kv-cache 8GiB 框住）；與 ComfyUI 20G＋LM Studio 36.7G 共存、剩 16.5GiB，無衝突 |
 | G7 app→vLLM 整合 | ✅ 通過 | 於真正 app image 內：`resolve_endpoint('asr')` 取得；容器經 `host.docker.internal:8000/v1/models` 得 200 |
-| 🚦 Go/No-Go | ✅ **GO** | G3–G7 全綠；版本/env/啟動指令已回填 SOP §3.B |
+| 🚦 Go/No-Go | ✅ **GO** | G0–G7 全過（逐關 ✅）；版本/env/啟動指令已回填 SOP §3.B |
 
 狀態圖例：⬜ 待跑｜🔄 進行中｜✅ 通過｜⚠️ 走分支｜❌ 卡關
 
@@ -101,7 +101,7 @@
 - 於真正的 app image `transcription_tool-stt-app:latest`（含 app 全部 code＋deps）內跑：設 DATA_DIR/DB_PATH、`init_db`、註冊 `function=asr` 端點(url=`http://host.docker.internal:8000/v1`、model=Qwen/Qwen3-ASR-1.7B)，`resolve_endpoint('asr')` 正確取回；再從容器內 `urlopen(url+'/models')` → HTTP 200、model=Qwen/Qwen3-ASR-1.7B。容器以 `--add-host=host.docker.internal:host-gateway`（同 docker-compose `extra_hosts`）。**G7 ✅。**
 
 **⑭ 2026-06-26｜🚦 Go/No-Go = GO**
-- G3–G7 全綠：完整編譯在 Blackwell sm_120 可用、批次與串流（含真 WebSocket `/v1/realtime`）皆可、VRAM 受框且共用卡無衝突、app 路由與容器連通驗證。
+- G0–G7 全過：前置完整性/環境/sm_120 kernel（G0–G2）＋完整編譯在 Blackwell sm_120 可用、批次與串流（含真 WebSocket `/v1/realtime`）皆可、VRAM 受框且共用卡無衝突、app 路由與容器連通驗證（G3–G7）。
 - **S-06 解鎖**：即時串流走 `/v1/realtime`（5s 段 partial、無時間戳）；S-04 批次走 `/v1/audio/transcriptions`。
 - 版本/env/啟動指令／共用 GPU 雷已回填 `model-setup-SOP.md` §3.B。
 - 與接手文件三條解法對照：採**路C**（`VLLM_USE_FLASHINFER_SAMPLER=0`，最省事、仍完整編譯），未動 root（路A）/未對齊 venv CUDA 套件（路B）。額外解掉文件未預期的兩點：① 共用 GPU profiling race → `--kv-cache-memory-bytes`；② 伺服器解碼缺 soundfile。

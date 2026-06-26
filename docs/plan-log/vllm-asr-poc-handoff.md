@@ -6,6 +6,10 @@
 
 ---
 
+> ✅ **狀態更新（2026-06-26，本文件已收尾）**：PoC **結論 GO**——下方「目前卡點／你的任務」**已全部完成**，本文件僅留存歷史脈絡。
+> CCCL 版本衝突採**路C**（`export VLLM_USE_FLASHINFER_SAMPLER=0`）解掉，G3 完整編譯起得來、G4–G7 全過、串流（SSE＋WebSocket `/v1/realtime`）可用。
+> **接手者不需再執行本文件的任務**；最終 pin 的版本/env/啟動指令見 `docs/model-setup-SOP.md` §3.B，逐關證據見 `docs/dev_log/vllm-asr-poc.md` ⑨–⑭。
+
 ## 0. 一分鐘摘要
 語音轉文字工具（stt-translate）的即時 ASR 必須用 vLLM 跑 Qwen3-ASR（D-13）。GPU 是 RTX PRO 6000 **Blackwell（sm_120）**，D-16 要先 PoC 驗證可行。
 - ✅ **最大風險已排除**：sm_120 kernel 實測可用（torch 算得出來、arch_list 含 sm_120）。

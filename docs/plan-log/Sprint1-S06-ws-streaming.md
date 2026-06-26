@@ -28,6 +28,22 @@
 7. **idle 插點**：呼叫 `idle.tracker.record_use("asr")` / `record_use("live_tr")`（補 G5 wiring）。
 8. **前端**：app.js「即時翻譯」頁接 `/ws/live`，interim 半透明／final 實心（§3.1a 留白節奏、draft→落定）。
 
+## 2.5 PoC 接線清單（`vllm-asr-poc` dev_log 實證 → 實作必讀）
+> 以下是 PoC 已踩過並解掉的雷，§2 各步實作時務必照辦、勿重新發現。出處：`docs/dev_log/vllm-asr-poc.md` ⑨–⑭、`docs/model-setup-SOP.md` §3.B。
+
+- **A. `/v1/realtime` 握手序列（最會卡）**（dev_log ⑪）：`session.update` → **`commit(final=False)` 才會「啟動」generation** → `append` 音框 → `commit(final=True)` 收尾。漏掉 `commit(final=False)` 會**收不到任何 delta**（PoC 首測就栽在這）。
+- **B. ASR server 必須以 realtime 架構啟動**：`/v1/realtime` 預設不掛載，要 `--hf-overrides '{"architectures":["Qwen3ASRRealtimeGeneration"]}'`（SOP §3.B 步驟 4）。→ 本軌須先建 systemd unit **`stt-vllm-asr`**（`services/idle.py:29` 已引用、`idle.py:27` 標「待 S-06/PoC 建立」），讓 model_ctl 能按需起停（D-06）。同一份權重的 realtime server 也同時服務批次/SSE。
+- **C. 串流輸出要剝前綴**：realtime/SSE 每個 delta 帶 `language {lang}<asr_text>` 前綴，**批次端點 server 端會剝、串流不剝**（SOP §3.B 點 6）→ `services/asr.py` 解析時自行剝除，否則下行 `src` 帶雜訊。
+- **D. 切段必須 VAD/重疊**：固定 5s 緩衝會在段界切字（「長辈」→「长｜备」，dev_log ⑪），首 partial ≈5.24s。→ §2 步驟 3 的 VAD/重疊切段是**必需、非選配**。
+- **E. 音訊格式轉換（原 plan 未列）**：PoC 餵 **16kHz 單聲道 PCM16、0.5s/塊**。前端 `getUserMedia` → AudioContext 降取樣 16k PCM16；server 轉 base64 PCM 給 realtime `append`。此為 `/ws/live` 上行最易卡的整合點。
+- **F. 時間/延遲**：不回時間戳（NG-6），下行 `t` 用伺服器時鐘；首 partial ≈5s＋ASR＋NLLB 扇出，驗收「幾句內出現譯文」以此為基準，非「即時逐字」。
+- **G. 版本/啟動指令 pin 在 SOP §3.B**：torch 走 **cu130**（PoC G2 實測 sm_120 OK），勿重挑 build。
+
+## 2.6 前置決策（2026-06-26 拍板）：NLLB 先行，再做完整 S-06
+- PoC 只驗了 **ASR**，**未驗即時翻譯**；§2 步驟 2 依賴的 NLLB(`live_tr`, :8001) 服務尚未做（SOP §3.C「要自己包」、`idle.py:30` 的 `stt-nllb` unit 亦未建）。
+- **決議**：**先補 NLLB 服務並驗過 → 再做完整 S-06（ASR＋即時翻譯一次到位）**。S-06 起步被 NLLB 擋住，但一次做到位、不留半截。
+- ⚠ **PoC 交叉發現（NLLB 建置必看）**：SOP §3.C 的 NLLB venv 寫 `--index-url .../whl/cu128 torch`，但 PoC G2 在 **sm_120 實測驗過的是 cu130**。NLLB 走 transformers（torch 非 vLLM 強制 pin），建 venv 後**務必比照 PoC 先驗 sm_120 kernel**（`is_available()`＋`get_arch_list()` 含 `sm_120`＋實跑 matmul），別假設 cu128 在 Blackwell 可用。
+
 ## 3. 收標準（對齊規格 S-06）
 - [ ] 說中文後幾句內出現對應譯文
 - [ ] interim 半透明、final 實心
